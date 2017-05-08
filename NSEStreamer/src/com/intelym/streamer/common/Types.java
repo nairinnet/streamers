@@ -63,15 +63,15 @@ public class Types {
                             BSE = 1,
                             NCDEX = 4,
                             MCX = 5,
-                            FONSE=6,
-                            CURNSE=7,
+                            FONSE = 2,
+                            CURNSE = 3,
                             INDEX = 11;
     
     public static final String  sRunningExchange_NSE = "NSE",
                                 sRunningExchange_FONSE = "FONSE",
                                 sRunningExchange_CURNSE = "CURNSE";
     
-    public static final int iRunningExchange_NSE = 11,
-                            iRunningExchange_FONSE = 12,
-                            iRunningExchange_CURNSE = 13;
+    public static final int iRunningExchange_NSE = 0,
+                            iRunningExchange_FONSE = 2,
+                            iRunningExchange_CURNSE = 3;
 }

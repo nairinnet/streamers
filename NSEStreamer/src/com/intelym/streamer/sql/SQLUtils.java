@@ -72,20 +72,13 @@ public final class SQLUtils {
                         try{
                             cmToken = Integer.parseInt(tmp);
                         }catch(NumberFormatException e){
-                            if(indexMap.containsKey(tmp)){
-                                IndicesInfo iInfo = indexMap.get(tmp.toUpperCase().trim());
-                                cmToken = iInfo.indexId;
-                                isIndex = true;
-                            }
-                            else {
-                                continue;
-                            }
+                            isIndex = true;
                         }
                         int focmToken = rs.getInt(4);
                         DerivativesScrip dScrip = new DerivativesScrip();
                         dScrip.ebaStockCode = ebaStockcode;
                         dScrip.exchangeCode = exchangeCode;
-                        dScrip.cmToken = cmToken;
+                        dScrip.cmToken = tmp;
                         dScrip.focmToken = focmToken;
                         dScrip.isIndex = isIndex;
                         scripMap.put(focmToken, dScrip);

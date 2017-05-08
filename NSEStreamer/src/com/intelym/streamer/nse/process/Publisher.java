@@ -467,16 +467,20 @@ public class Publisher implements Runnable {
             switch(runningExchange){
                 
                 case Types.iRunningExchange_NSE:
+                case Types.iRunningExchange_CURNSE:
                 {
-                    int exchangeCode = Types.NSE;
+                    int exchangeCode = runningExchange;
                     ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
                     NSEOutputStream dataOut = new NSEOutputStream(byteArray);
                     dataOut.writeByte(1);
                     dataOut.writeByte(exchangeCode);
                     dataOut.writeByte(1);
-                    dataOut.writeByte(80); //length of this packet top to bottom
-                    dataOut.writeInt(iData.scripCode);
-                    // Next 3 line is written by Nirmal
+                    int length = String.valueOf(iData.scripCode).length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(68 + 1 + length); 
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.lastTradedPrice);
 
                     // Next 2 to lines needs to be approved by HARI 
@@ -493,26 +497,32 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.weightedAverage);
                     dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
                     dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
-                    dataOut.writeInt(iData.lowerCircuit);
-                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
                     return byteArray.toByteArray();
                 }
                 case Types.iRunningExchange_FONSE:
                 {
-                    int exchangeCode = Types.NSE;
-                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
-                    dataOut.writeByte(1);
-                    dataOut.writeByte(exchangeCode);
-                    dataOut.writeByte(5);
-                    dataOut.writeByte(65); //length of this packet top to bottom
-                    dataOut.writeInt(iData.scripCode);
                     DerivativesScrip dScrip = derivativeMappingScrips.get(iData.scripCode);
                     if (dScrip == null){
                         return null;
                     }
-                    dataOut.writeInt(dScrip.cmToken);
+                    int exchangeCode = runningExchange;
+                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
+                    dataOut.writeByte(111);
+                    dataOut.writeByte(exchangeCode);
+                    dataOut.writeByte(5);
+                    
+                    int length = String.valueOf(iData.scripCode).length();
+                    int usLength = dScrip.cmToken.length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
+                    dataOut.writeByte(usLength);
+                    dataOut.writeBytes(dScrip.cmToken);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -635,14 +645,20 @@ public class Publisher implements Runnable {
              switch(runningExchange){
                 
                 case Types.iRunningExchange_NSE:
+                case Types.iRunningExchange_CURNSE:
                 {
-                    int exchangeCode = Types.NSE;
+                    int exchangeCode = runningExchange;
                     ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
                     NSEOutputStream dataOut = new NSEOutputStream(byteArray);
                     dataOut.writeByte(1);
                     dataOut.writeByte(exchangeCode);
                     dataOut.writeByte(13);
-                    dataOut.writeByte(56); //length of this packet top to bottom
+                    int length = String.valueOf(iData.scripCode).length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(52 + 1 + length); 
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.scripCode);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.tradedVolume);
@@ -659,19 +675,27 @@ public class Publisher implements Runnable {
                 }
                 case Types.iRunningExchange_FONSE:
                 {
-                    int exchangeCode = Types.NSE;
-                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
-                    dataOut.writeByte(1);
-                    dataOut.writeByte(exchangeCode);
-                    dataOut.writeByte(5);
-                    dataOut.writeByte(65); //length of this packet top to bottom
-                    dataOut.writeInt(iData.scripCode);
                     DerivativesScrip dScrip = derivativeMappingScrips.get(iData.scripCode);
                     if (dScrip == null){
                         return null;
                     }
-                    dataOut.writeInt(dScrip.cmToken);
+                    int exchangeCode = runningExchange;
+                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
+                    dataOut.writeByte(111);
+                    dataOut.writeByte(exchangeCode);
+                    dataOut.writeByte(5);
+                    
+                    int length = String.valueOf(iData.scripCode).length();
+                    int usLength = dScrip.cmToken.length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
+                    dataOut.writeByte(usLength);
+                    dataOut.writeBytes(dScrip.cmToken);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -744,15 +768,19 @@ public class Publisher implements Runnable {
         if (doBroadcast) {
             //For BSE Packet Type 2
             // Len(ScripId)^ScripId^LTP^Buy Rate^BuyQty^Sell Rate^Sell Qty^TTV
-            if (runningExchange == Types.iRunningExchange_NSE){
-                int exchangeCode = Types.NSE;
+            if (runningExchange == Types.iRunningExchange_NSE || runningExchange == Types.iRunningExchange_CURNSE){
+                int exchangeCode = runningExchange;
                 ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
                 NSEOutputStream dataOut = new NSEOutputStream(byteArray);
                 dataOut.writeByte(1);
                 dataOut.writeByte(exchangeCode);
                 dataOut.writeByte(2);
-                dataOut.writeByte(32); // length of this packet top to bottom
-                dataOut.writeInt(iData.scripCode);
+                int length = String.valueOf(iData.scripCode).length();
+                //length of this packet top to bottom
+                // entire packet + 1 byte length scripcode + length of the scripcode 
+                dataOut.writeByte(28 + 1 + length); 
+                dataOut.writeByte(length);
+                dataOut.writeBytes(String.valueOf(iData.scripCode));
                 dataOut.writeInt(iData.lastTradedPrice);
                 dataOut.writeInt(iData.highPrice); // Buy Rate
                 dataOut.writeInt(iData.totalBidQty); //Buy Qty
@@ -793,8 +821,12 @@ public class Publisher implements Runnable {
         dataOut.writeByte(1);
         dataOut.writeByte(exchangeCode);
         dataOut.writeByte(12);
-        dataOut.writeByte(20); // length of this packet top to bottom
-        dataOut.writeInt(iData.scripCode);
+        int length = String.valueOf(iData.scripCode).length();
+        //length of this packet top to bottom
+        // entire packet + 1 byte length scripcode + length of the scripcode 
+        dataOut.writeByte(20 + 1 + length); 
+        dataOut.writeByte(length);
+        dataOut.writeBytes(String.valueOf(iData.scripCode));
         dataOut.writeInt(iData.openInterest);
         dataOut.writeInt(iData.lastTradedPrice);
         dataOut.writeInt(iData.tradedVolume);
@@ -912,18 +944,19 @@ public class Publisher implements Runnable {
             switch (runningExchange) {
                 case Types.iRunningExchange_NSE:
                 {
-                    int exchangeCode = Types.NSE;
+                    int exchangeCode = runningExchange;
                     ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
                     NSEOutputStream dataOut = new NSEOutputStream(byteArray);
                     dataOut.writeByte(1);
                     dataOut.writeByte(exchangeCode);
                     dataOut.writeByte(1);
-                    dataOut.writeByte(80); //length of this packet top to bottom
-                    dataOut.writeInt(iData.scripCode);
-                    // Next 3 line is written by Nirmal
+                    int length = String.valueOf(iData.scripCode).length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(68 + 1 + length); 
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.lastTradedPrice);
-                    
-                    // Next 2 to lines needs to be approved by HARI
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
                     dataOut.writeInt(iData.mDepth[0][1]);
@@ -937,26 +970,31 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.weightedAverage);
                     dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
                     dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
-                    dataOut.writeInt(iData.lowerCircuit);
-                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
                     return byteArray.toByteArray();
                 }
                 case Types.iRunningExchange_FONSE:
                 {
-                    int exchangeCode = Types.NSE;
-                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
-                    dataOut.writeByte(1);
-                    dataOut.writeByte(exchangeCode);
-                    dataOut.writeByte(5);
-                    dataOut.writeByte(65); //length of this packet top to bottom
-                    dataOut.writeInt(iData.scripCode);
                     DerivativesScrip dScrip = derivativeMappingScrips.get(iData.scripCode);
                     if (dScrip == null){
                         return null;
                     }
-                    dataOut.writeInt(dScrip.cmToken);
+                    int exchangeCode = runningExchange;
+                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
+                    dataOut.writeByte(111);
+                    dataOut.writeByte(exchangeCode);
+                    dataOut.writeByte(5);
+                    int length = String.valueOf(iData.scripCode).length();
+                    int usLength = dScrip.cmToken.length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
+                    dataOut.writeByte(usLength);
+                    dataOut.writeBytes(dScrip.cmToken);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -1055,29 +1093,18 @@ public class Publisher implements Runnable {
     
     public byte[] sendMDepthDataOverBinary_TCP(IData iData) {
         try {
-            int exchangeCode = Types.NSE;
-            String LTT = " ";
-            try{
-            DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-            long milliSeconds= iData.timeInMillis;
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTimeInMillis(milliSeconds);
-            LTT = formatter.format(calendar.getTime());
-            }catch(Exception ex){}
-            
+            int exchangeCode = runningExchange;
             ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
             NSEOutputStream dataOut = new NSEOutputStream(byteArray);
             dataOut.writeByte(2);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(4);
-            if (exchangeCode == 0){
-                dataOut.writeByte(117);// length of the packet
-            }
-            else {
-                dataOut.writeByte(97);// length of the packet
-            }
-            
-            dataOut.writeInt(iData.scripCode);
+            int length = String.valueOf(iData.scripCode).length();
+            //length of this packet top to bottom
+            // entire packet + 1 byte length scripcode + length of the scripcode 
+            dataOut.writeByte(113 + 1 + length); 
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
             dataOut.writeByte(5);
             dataOut.writeInt(iData.mDepth[0][0]);
             dataOut.writeInt(iData.mDepth[0][1]);
@@ -1187,12 +1214,7 @@ public class Publisher implements Runnable {
     }
 
     private byte[] sendIndexBroadcast_TCP(IData iData) throws Exception {
-        IndicesInfo iInfo = getIndexIds(iData.scripId.trim());
-        if (iInfo == null) {
-            return null;
-        }
-        iData.scripCode = iInfo.indexId;
-        int exchangeCode = Types.INDEX;
+        int exchangeCode = runningExchange;
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         NSEOutputStream dataOut = new NSEOutputStream(byteArray);
 
@@ -1201,7 +1223,12 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
-            dataOut.writeByte(28 + 1 + tS.length);
+            int length = String.valueOf(iData.scripId).length();
+            //length of this packet top to bottom
+            // entire packet + 1 byte length scripcode + length of the scripcode  + 1 byte length timestamp + length of the timestamp
+            dataOut.writeByte(24 + 1 + length + 1 + tS.length); 
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripId));
             dataOut.writeInt(iData.scripCode);
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.closePrice);

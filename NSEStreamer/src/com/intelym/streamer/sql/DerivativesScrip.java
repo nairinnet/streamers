@@ -11,10 +11,11 @@ package com.intelym.streamer.sql;
  */
 public class DerivativesScrip {
     public String   ebaStockCode,
-                    exchangeCode;
+                    exchangeCode,
+                    cmToken;
                     
-    public int  focmToken = -1,
-                cmToken;
+    public int  focmToken = -1;
+                
     
     public boolean isIndex = false;
 }
