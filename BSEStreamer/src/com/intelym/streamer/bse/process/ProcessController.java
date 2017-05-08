@@ -19,6 +19,7 @@ import com.intelym.streamer.messages.bse.MarketPicture1901;
 import com.intelym.streamer.messages.bse.MarketPicture1906;
 import com.intelym.streamer.messages.bse.MarketPictureBroadcast;
 import com.intelym.streamer.messages.bse.OMBHeader;
+import com.intelym.streamer.messages.bse.OpenInterestBroadcast;
 import java.util.TreeMap;
 import javolution.util.FastMap;
 
@@ -116,9 +117,11 @@ public class ProcessController implements ProcessManager {
                     break;
                 case Types.BSE_NFCAST_OPEN:
                 case Types.BSE_NFCAST_CLOSE:
-                case Types.BSE_NFCAST_OI:
                 case Types.BSE_NFCAST_VAR:
                 case Types.BSE_NFCAST_AUCTION_MP:
+                    break;
+                case Types.BSE_NFCAST_OI:
+                    getOpenInterest(in, Types.BSE_NFCAST_OI);
                     break;
                 default:
                     break;
@@ -133,6 +136,18 @@ public class ProcessController implements ProcessManager {
     }
 
     /****** Message Area *************/
+    private void getOpenInterest(BSEInputStream in, int flag) throws Exception {
+        OpenInterestBroadcast oBroadcast = new OpenInterestBroadcast();
+        IData iData = oBroadcast.processLevel1Messages(in);
+        for (int i = 0; i < iData.noOfRecords; i++) {
+             IData iData2 = oBroadcast.processLevel2Messages(in);
+             iData2.publishCode = Types.BC_MARKETWATCH_BSET;
+             iData2.timeStamp = iData.timeStamp;
+             iData2.tradingSession = iData.tradingSession;
+             streamToRiwa(iData2);
+        }
+    }
+    
     private void getSensexBroadcast(BSEInputStream in, int flag) throws Exception {
 
         if (flag == Types.BSE_NFCAST_SENSEX_BROADCAST) {

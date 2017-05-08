@@ -41,4 +41,7 @@ public class IData {
     public int[][] mDepth = new int[5][6];
     public int[][] mDepth06 = null;
     public int[][] mDepth16 = null;
+    public int oiQty;
+    public int oiValue;
+    public int oiChange;
 }

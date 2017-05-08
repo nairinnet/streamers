@@ -282,6 +282,10 @@ public class Publisher implements Runnable {
                             break;
 
                         case Types.BC_MARKETWATCH_BSET:
+                            buffer = sendOpenInterest_TCP(iData);
+                            if (buffer != null) {
+                                streamRawbuffer(buffer);
+                            }
                             break;
                         case Types.BC_MARKETDEPTH:
                             break;
@@ -290,7 +294,7 @@ public class Publisher implements Runnable {
             }
 
         } catch (Exception lEx) {
-            mLog.error("Publish to RIWA Fails, Detailed Msg is : " + lEx.getMessage());
+            mLog.error("Publish to Quick Fails, Detailed Msg is : " + lEx.getMessage());
         }
     }
 
@@ -325,8 +329,10 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(1);
-            dataOut.writeByte(80); //length of this packet top to bottom
-            dataOut.writeInt(iData.scripCode);
+            int length = String.valueOf(iData.scripCode).length();
+            dataOut.writeByte(76 + 1 + length);
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.closePrice);
             dataOut.writeInt(iData.mDepth[0][0]);
@@ -358,9 +364,11 @@ public class Publisher implements Runnable {
             dataOut.writeByte(2);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(4);
-            dataOut.writeByte(97);// length of the packet
-            dataOut.writeInt(iData.scripCode);
-            dataOut.writeByte(5);
+            int length = String.valueOf(iData.scripCode).length();
+            dataOut.writeByte(93 + 1 + length);
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
+            dataOut.writeByte(5); // no of records
             dataOut.writeInt(iData.mDepth[0][0]);
             dataOut.writeInt(iData.mDepth[0][1]);
             dataOut.writeInt(iData.mDepth[0][2]);
@@ -459,8 +467,10 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(2);
-            dataOut.writeByte(44);
-            dataOut.writeInt(iData.scripCode);
+            int length = String.valueOf(iData.scripCode).length();
+            dataOut.writeByte(36 + 1 + length);
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
 
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.highPrice);
@@ -564,8 +574,11 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(13);
-            dataOut.writeByte(56);
-            dataOut.writeInt(iData.scripCode);
+            
+            int length = String.valueOf(iData.scripCode).length();
+            dataOut.writeByte(52 + 1 + length);
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.tradedValue);
             dataOut.writeInt(iData.highPrice);
@@ -638,8 +651,11 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(2);
-            dataOut.writeByte(44);
-            dataOut.writeInt(iData.scripCode);
+            
+            int length = String.valueOf(iData.scripCode).length();
+            dataOut.writeByte(36 + 1 + length);
+            dataOut.writeByte(length);
+            dataOut.writeBytes(String.valueOf(iData.scripCode));
 
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.highPrice);
@@ -777,22 +793,19 @@ public class Publisher implements Runnable {
     }
 
     private byte[] sendIndexBroadcast_TCP(IData iData) throws Exception {
-        IndicesInfo iInfo = getIndexIds(iData.scripId.trim());
-        if (iInfo == null) {
-            return null;
-        }
-        iData.scripCode = iInfo.indexId;
         int exchangeCode = Types.INDEX;
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         BSEOutputStream dataOut = new BSEOutputStream(byteArray);
 
         try {
             byte[] tS = iData.timeStamp.getBytes();
+            byte[] sC = iData.scripId.trim().getBytes();
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
-            dataOut.writeByte(28 + 1 + tS.length);
-            dataOut.writeInt(iData.scripCode);
+            dataOut.writeByte(20 + 1 + tS.length + 1 + sC.length);
+            dataOut.writeByte(sC.length);
+            dataOut.write(sC);
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.closePrice);
             dataOut.writeInt(iData.highPrice);
@@ -843,6 +856,26 @@ public class Publisher implements Runnable {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    private byte[] sendOpenInterest_TCP(IData iData) throws Exception {
+        int exchangeCode = Types.BSE;
+        ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+        BSEOutputStream dataOut = new BSEOutputStream(byteArray);
+        dataOut.writeByte(1);
+        dataOut.writeByte(exchangeCode);
+        dataOut.writeByte(12);
+        int length = String.valueOf(iData.scripCode).length();
+        //length of this packet top to bottom
+        // entire packet + 1 byte length scripcode + length of the scripcode 
+        dataOut.writeByte(12 + 1 + length); 
+        dataOut.writeByte(length);
+        dataOut.writeBytes(String.valueOf(iData.scripCode));
+        dataOut.writeInt(iData.oiValue);
+        dataOut.writeInt(iData.oiChange);
+        dataOut.writeInt(iData.oiQty);
+        return byteArray.toByteArray();
+        
     }
 
     private IndicesInfo getIndexIds(String index) {
