@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class Publisher implements Runnable {
 
-    private static RiwaLogger mLog = LoggerFactory.getLogger(Publisher.class);
+    private static final RiwaLogger mLog = LoggerFactory.getLogger(Publisher.class);
     private StreamerConfiguration sConfiguration;
     private MulticastSocket mSocket;
     private MulticastSocket mSocket1;
@@ -307,82 +307,6 @@ public class Publisher implements Runnable {
 
         } catch (Exception lEx) {
             mLog.error("Publish to RIWA Fails, Detailed Msg is : " + lEx.getMessage());
-        }
-    }
-
-    private String sendMarketPictureBroadcast(IData iData) throws Exception {
-        boolean doBroadcast = true;
-        if (scripsMap != null) {
-            if (scripsMap.containsKey(iData.scripCode)) {
-                ScripData scripData = scripsMap.get(iData.scripCode);
-                long timeInMillis = scripData.timeInMillis;
-                scripData.timeInMillis = iData.timeInMillis;
-                scripData.lastTradedPrice = iData.lastTradedPrice;
-                scripData.prevClosePrice = iData.prevClosePrice;
-                if (timeInMillis != 0 & delayTimeDifference > 0) {
-                    if ((iData.timeInMillis - timeInMillis) >= delayTimeDifference) {
-                        scripsMap.put(iData.scripCode, scripData);
-                        doBroadcast = true;
-                    } else {
-                        doBroadcast = false;
-                    }
-                } else {
-                    scripsMap.put(iData.scripCode, scripData);
-                }
-
-            }
-        }
-        if (doBroadcast) {
-            String LTT = " ";
-            try{
-        /*    DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-            long milliSeconds= iData.timeInMillis;
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTimeInMillis(milliSeconds);
-            LTT = formatter.format(calendar.getTime());*/
-            SimpleDateFormat sFddMMMYYYY = new SimpleDateFormat("dd-MMM-YYYY hh:mm:ss");
-             LTT =   sFddMMMYYYY.format(iData.timeInMillis);
-            }catch(Exception ex){}
-            
-            int exchangeCode = Types.NSE;
-            ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-            NSEOutputStream dataOut = new NSEOutputStream(byteArray);
-            dataOut.writeByte(1);
-            dataOut.writeByte(exchangeCode);
-            dataOut.writeByte(1);
-            int length = iData.scripId.length();
-            dataOut.writeByte(length);
-
-            dataOut.writeBytes(iData.scripId);
-            dataOut.writeInt(iData.lastTradedPrice);
-            dataOut.writeInt(iData.prevClosePrice);
-            dataOut.writeInt(iData.tradedValue);
-            dataOut.writeInt(iData.mDepth[0][0]);
-            dataOut.writeInt(iData.mDepth[0][1]);
-            dataOut.writeInt(iData.mDepth[0][3]);
-            dataOut.writeInt(iData.mDepth[0][4]);
-            dataOut.writeInt(iData.tradedVolume);
-            dataOut.writeInt(iData.highPrice);
-            dataOut.writeInt(iData.lowPrice);
-            dataOut.writeInt(iData.openPrice);
-            dataOut.writeInt(iData.lastTradedQty);
-            dataOut.writeInt(iData.weightedAverage);
-            dataOut.writeInt(iData.totalBidQty);
-            dataOut.writeInt(iData.totalSellQty);
-            // Next 3 Lines :  Copied by Nirmal - instuction by Hari on 05-01-2014
-            dataOut.writeInt(iData.lowerCircuit);
-            dataOut.writeInt(iData.upperCircuit);
-            
-            dataOut.writeByte(LTT.length());
-            dataOut.writeBytes(LTT);
-            
-            System.out.println(LTT);
-            dataOut.writeByte(Integer.valueOf(iData.tradingSession).byteValue());
-            byte[] buffer = byteArray.toByteArray();
-            String s = javax.xml.bind.DatatypeConverter.printBase64Binary(buffer);
-            return s;
-        } else {
-            return null;
         }
     }
 
@@ -1156,39 +1080,7 @@ public class Publisher implements Runnable {
         }
     }
     
-    /**
-     * Creates the Index Broadcast Packet
-     * @param iData
-     * @return
-     * @throws Exception 
-     */
-    private String sendIndexBroadcast(IData iData) throws Exception {
-        int exchangeCode = Types.NSE;
-        ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-        NSEOutputStream dataOut = new NSEOutputStream(byteArray);
-        dataOut.writeByte(1);
-        dataOut.writeByte(exchangeCode);
-        dataOut.writeByte(3);
-        int length = iData.scripId.length();
-        dataOut.writeByte(length);
-        dataOut.writeBytes(iData.scripId.trim());
-        dataOut.writeInt(iData.lastTradedPrice);
-        dataOut.writeInt(iData.closePrice);
-        //dataOut.writeByte(iData.timeStamp.length());
-        //dataOut.writeBytes(iData.timeStamp);
-        dataOut.writeByte(Integer.valueOf(iData.tradingSession).byteValue());
-        byte[] buffer = byteArray.toByteArray();
-        String s = javax.xml.bind.DatatypeConverter.printBase64Binary(buffer);
-        return s;
-
-    }
-
     private String sendIndexBroadcast_WS(IData iData) throws Exception {
-        /*IndicesInfo iInfo = getIndexIds(iData.scripId.trim());
-        if (iInfo == null) {
-            return null;
-        }
-        iData.scripId = iInfo.indexId + "";*/
         int exchangeCode = Types.NSE;
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         NSEOutputStream dataOut = new NSEOutputStream(byteArray);
@@ -1223,13 +1115,12 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
-            int length = String.valueOf(iData.scripId).length();
+            int length = iData.scripId.length();
             //length of this packet top to bottom
             // entire packet + 1 byte length scripcode + length of the scripcode  + 1 byte length timestamp + length of the timestamp
-            dataOut.writeByte(24 + 1 + length + 1 + tS.length); 
+            dataOut.writeByte(20 + 1 + length + 1 + tS.length); 
             dataOut.writeByte(length);
             dataOut.writeBytes(String.valueOf(iData.scripId));
-            dataOut.writeInt(iData.scripCode);
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.closePrice);
             dataOut.writeInt(iData.highPrice);
@@ -1244,11 +1135,6 @@ public class Publisher implements Runnable {
         }
     }
     
-    private IndicesInfo getIndexIds(String index) {
-        IndicesInfo indexId = indexMap.get(index);
-        return indexId;
-    }
-
     private void streamRawbuffer(byte[] buffer) {
         try {
             DatagramPacket dPacket = new DatagramPacket(buffer, buffer.length);
@@ -1256,7 +1142,7 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
-        } catch (Exception lEx) {
+        } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
     }
@@ -1269,7 +1155,7 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
-        } catch (Exception lEx) {
+        } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
     }
