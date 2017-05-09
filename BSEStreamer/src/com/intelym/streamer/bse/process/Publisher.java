@@ -50,7 +50,7 @@ public class Publisher implements Runnable {
         scripsMap = sMap;
         sConfiguration = aConfiguration;
         publisherQueue = new LinkedBlockingQueue();
-
+        indexLoader = new IndexLoader();
         String tmp = sConfiguration.getString("RIWA.Output.Type");
         if (tmp != null) {
             switch (tmp) {
@@ -803,7 +803,7 @@ public class Publisher implements Runnable {
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
-            dataOut.writeByte(20 + 1 + tS.length + 1 + sC.length);
+            dataOut.writeByte(24 + 1 + tS.length + 1 + sC.length);
             dataOut.writeByte(sC.length);
             dataOut.write(sC);
             dataOut.writeInt(iData.lastTradedPrice);
