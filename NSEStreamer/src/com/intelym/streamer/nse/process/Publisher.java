@@ -20,6 +20,7 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.text.DateFormat;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -36,12 +37,12 @@ public class Publisher implements Runnable {
 
     private static final RiwaLogger mLog = LoggerFactory.getLogger(Publisher.class);
     private StreamerConfiguration sConfiguration;
-    private MulticastSocket mSocket;
+    private MulticastSocket mSocket, mAsciiSocket;
     private MulticastSocket mSocket1;
-    private int sPort = 7000;
+    private int sPort = 7000, sAsciiPort = 7001;
     private int sPort1 = 0;
-    private InetAddress sAddress = null;
-    private InetAddress sBindAddress = null;
+    private InetAddress sAddress = null, sAsciiAddress = null;
+    private InetAddress sBindAddress = null, sAsciiBindAddress = null;
     private boolean sMulticast = false;
     private boolean isRunning = false;
     private Thread streamThread = null;
@@ -52,13 +53,14 @@ public class Publisher implements Runnable {
     private final TreeMap<Integer, ScripData> scripsMap;
     private final TreeMap<Integer, ScripData> scripFeedTimeBased; // Modified by Nirmal
     private final TreeMap<String, ArrayList> scripMapTimeBased; // Modified by Nirmal
-    
+    private final TreeMap<Integer, IData> dprChangeMap;
+    private NumberFormat nF;
     private SQLUtils sqlUtils = null;
     private HashMap<Integer, DerivativesScrip> derivativeMappingScrips = null;
     private int runningExchange = -1;
     private IndexLoader indexLoader = null;
+    private boolean isAsciiRequired = false;
 
-   // public Publisher(StreamerConfiguration aConfiguration, TreeMap sMap, TreeMap iMap) {
     public Publisher(StreamerConfiguration aConfiguration, TreeMap sMap, TreeMap iMap, TreeMap sTimeBasedScrip) { // Modified by Nirmal
         scripsMap = sMap;
         scripMapTimeBased = sTimeBasedScrip; // Modified by Nirmal
@@ -66,6 +68,11 @@ public class Publisher implements Runnable {
         sConfiguration = aConfiguration;
         publisherQueue = new LinkedBlockingQueue();
         indexLoader = new IndexLoader();
+        dprChangeMap = new TreeMap<>();
+        nF = NumberFormat.getInstance();
+        nF.setMinimumFractionDigits(2);
+        nF.setMaximumFractionDigits(2);
+        nF.setGroupingUsed(false);
         try{
             indexMap = indexLoader.getIndexMap();
             sqlUtils = new SQLUtils();
@@ -105,6 +112,7 @@ public class Publisher implements Runnable {
                 System.exit(0);
             }
         }
+        
         
     }
 
@@ -155,8 +163,24 @@ public class Publisher implements Runnable {
             if (sPort1 > 0) {
                 mSocket1 = new MulticastSocket();
             }
+            String tmp = sConfiguration.getString("RIWA.AsciiOutputEnabled");
+            if (tmp != null && tmp.equalsIgnoreCase("true")){
+                isAsciiRequired = true;
+                tmp = sConfiguration.getString("RIWA.AsciiOutputAddress");
+                sAsciiAddress = InetAddress.getByName(tmp);
+                tmp = sConfiguration.getString("RIWA.AsciiStreamPort");
+                sAsciiPort = Integer.parseInt(tmp);
+                bindAddress = sConfiguration.getString("RIWA.AsciiStreamBindAddress");
+                if (bindAddress != null) {
+                    sAsciiBindAddress = InetAddress.getByName(bindAddress);
+                }
+                mAsciiSocket = new MulticastSocket();
+            }
+            
             isRunning = true;
             streamThread.start();
+            
+            
             mLog.info("RIWA.Stream queue started successfully....");
             
         } catch (IOException | NumberFormatException e) {
@@ -301,6 +325,13 @@ public class Publisher implements Runnable {
                             break;
                         case Types.BC_MARKETDEPTH:
                             break;
+                        case Types.BC_DPR_CHANGE:
+                            buffer = sendDPRChange_TCP(iData);
+                            if (buffer != null) {
+                                streamRawbuffer(buffer);
+                            }
+                            break;
+                            
                     }
                     break;
             }
@@ -374,8 +405,32 @@ public class Publisher implements Runnable {
         }
     }
 
+    private byte[] sendDPRChange_TCP(IData iData) throws Exception {
+        dprChangeMap.put(iData.scripCode, iData);
+        int exchangeCode = runningExchange;
+        ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+        NSEOutputStream dataOut = new NSEOutputStream(byteArray);
+        dataOut.writeByte(1);
+        dataOut.writeByte(exchangeCode);
+        dataOut.writeByte(21);
+        int length = String.valueOf(iData.scripCode).length();
+        //length of this packet top to bottom
+        // entire packet + 1 byte length scripcode + length of the scripcode 
+        dataOut.writeByte(12 + 1 + length); 
+        dataOut.writeByte(length);
+        dataOut.writeBytes(String.valueOf(iData.scripCode));
+        dataOut.writeInt(iData.lowerCircuit);
+        dataOut.writeInt(iData.upperCircuit);
+        return byteArray.toByteArray();
+    }
+    
     private byte[] sendMarketPictureBroadcast1906_TCP(IData iData) throws Exception {
         boolean doBroadcast = true;
+        if (dprChangeMap.containsKey(iData.scripCode)){
+            IData iData2 = dprChangeMap.get(iData.scripCode);
+            iData.lowerCircuit = iData2.lowerCircuit;
+            iData.upperCircuit = iData2.upperCircuit;
+        }
         if (scripsMap != null) {
             if (scripsMap.containsKey(iData.scripCode)) {
                 ScripData scripData = scripsMap.get(iData.scripCode);
@@ -402,7 +457,7 @@ public class Publisher implements Runnable {
                     int length = String.valueOf(iData.scripCode).length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(68 + 1 + length); 
+                    dataOut.writeByte(76 + 1 + length); 
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.lastTradedPrice);
@@ -421,7 +476,21 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.weightedAverage);
                     dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
                     dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^1^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "N^^" + format(iData.lastTradedPrice) + "^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][1] + "^" + format(iData.mDepth[0][2])  + "^" + iData.mDepth[0][3] + "^";
+                        asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.openPrice) + "^";
+                        asciiData += format(iData.closePrice) + "^" + iData.d_totalBidQty  + "^" + iData.d_totalSellQty + "^";
+                        asciiData += iData.lastTradedQty + "^" + iData.tradedVolume + "^" + iData.tradedValue + "^";
+                        asciiData += "^^^^" + format(iData.weightedAverage) + "^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 case Types.iRunningExchange_FONSE:
@@ -441,7 +510,7 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
@@ -458,8 +527,18 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.lowPrice);
                     dataOut.writeInt(iData.openPrice);
                     dataOut.writeInt(iData.lastTradedQty);
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
                     dataOut.writeByte(dScrip.isIndex ? 1 : 0);
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^LIVE^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^11^4^5^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "^^^^^" + format(iData.openPrice) + "^" + format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.closePrice) + "^" + format(iData.lastTradedPrice) + "^^^" + iData.tradedVolume + "^" + iData.tradedValue + "^^^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][2] + "^" + format(iData.mDepth[0][1])  + "^" + iData.mDepth[0][3] + "^^^" + iData.lastTradedQty + "^^^" + format(iData.weightedAverage) + "^" +  iData.totalBidQty  + "^" + iData.totalSellQty + "^^^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 default:
@@ -541,6 +620,11 @@ public class Publisher implements Runnable {
     
     private byte[] sendMarketPictureBroadcast1916_TCP(IData iData) throws Exception {
         boolean doBroadcast = true;
+        if (dprChangeMap.containsKey(iData.scripCode)){
+            IData iData2 = dprChangeMap.get(iData.scripCode);
+            iData.lowerCircuit = iData2.lowerCircuit;
+            iData.upperCircuit = iData2.upperCircuit;
+        }
         if (scripsMap != null) {
             if (scripsMap.containsKey(iData.scripCode)) {
                 ScripData scripData = scripsMap.get(iData.scripCode);
@@ -580,7 +664,7 @@ public class Publisher implements Runnable {
                     int length = String.valueOf(iData.scripCode).length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(52 + 1 + length); 
+                    dataOut.writeByte(60 + 1 + length); 
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.scripCode);
@@ -594,7 +678,20 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.weightedAverage);
                     dataOut.writeInt(iData.totalBidQty);
                     dataOut.writeInt(iData.totalSellQty);
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^1^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "N^^" + format(iData.lastTradedPrice) + "^^^^^^";
+                        asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.openPrice) + "^";
+                        asciiData += format(iData.closePrice) + "^" + iData.d_totalBidQty  + "^" + iData.d_totalSellQty + "^";
+                        asciiData += iData.lastTradedQty + "^" + iData.tradedVolume + "^" + iData.tradedValue + "^";
+                        asciiData += "^^^^" + format(iData.weightedAverage) + "^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 case Types.iRunningExchange_FONSE:
@@ -614,7 +711,7 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
@@ -631,8 +728,18 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.lowPrice);
                     dataOut.writeInt(iData.openPrice);
                     dataOut.writeInt(iData.lastTradedQty);
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
                     dataOut.writeByte(dScrip.isIndex ? 1 : 0);
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^LIVE^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^11^4^5^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "^^^^^" + format(iData.openPrice) + "^" + format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.closePrice) + "^" + format(iData.lastTradedPrice) + "^^^" + iData.tradedVolume + "^" + iData.tradedValue + "^^^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][2] + "^" + format(iData.mDepth[0][1])  + "^" + iData.mDepth[0][3] + "^^^" + iData.lastTradedQty + "^^^" + format(iData.weightedAverage) + "^" +  iData.totalBidQty  + "^" + iData.totalSellQty + "^^^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 default:
@@ -682,6 +789,11 @@ public class Publisher implements Runnable {
 
     private byte[] sendMarketPictureBroadcast1901_TCP(IData iData) throws Exception {
         boolean doBroadcast = true;
+         if (dprChangeMap.containsKey(iData.scripCode)){
+            IData iData2 = dprChangeMap.get(iData.scripCode);
+            iData.lowerCircuit = iData2.lowerCircuit;
+            iData.upperCircuit = iData2.upperCircuit;
+        }
         if (scripsMap != null) {
             if (scripsMap.containsKey(iData.scripCode)) {
                 ScripData scripData = scripsMap.get(iData.scripCode);
@@ -702,7 +814,7 @@ public class Publisher implements Runnable {
                 int length = String.valueOf(iData.scripCode).length();
                 //length of this packet top to bottom
                 // entire packet + 1 byte length scripcode + length of the scripcode 
-                dataOut.writeByte(28 + 1 + length); 
+                dataOut.writeByte(44 + 1 + length); 
                 dataOut.writeByte(length);
                 dataOut.writeBytes(String.valueOf(iData.scripCode));
                 dataOut.writeInt(iData.lastTradedPrice);
@@ -711,6 +823,18 @@ public class Publisher implements Runnable {
                 dataOut.writeInt(iData.lowPrice); //Sell Price
                 dataOut.writeInt(iData.totalSellQty); // Sell Qty
                 dataOut.writeInt(iData.tradedVolume);
+                dataOut.writeInt(iData.lowerCircuit);
+                dataOut.writeInt(iData.upperCircuit);
+                dataOut.writeLong(iData.timeInMillis);
+                if (isAsciiRequired){
+                    String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                    String asciiData = "^1^4^1^" + iData.timeStamp + "^" + iData.scripCode + "^";
+                    asciiData += "N^^" + format(iData.lastTradedPrice) + "^^^^^^";
+                    asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^^^";
+                    asciiData += iData.totalBidQty + "^" + iData.totalSellQty + "^^^^^^^^^^";
+                    String finalData = asciiHeader + asciiData.length() + asciiData;
+                    streamAscii(finalData);
+                }
                 return byteArray.toByteArray();
             }
             
@@ -764,25 +888,14 @@ public class Publisher implements Runnable {
             
             String LTT = " ";
             try{
-          /*  DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-                long milliSeconds= iData.timeInMillis+315513000;
-                Calendar calendar = Calendar.getInstance();
-                calendar.setTimeInMillis(milliSeconds);
-                LTT = formatter.format(calendar.getTime()); */
-              //  SimpleDateFormat sF = new SimpleDateFormat("dd-MMM-YYYY");
-              //   String currentDate = sF.format(new Date());
-        //iData.timeStamp = currentDate + " " + hour + ":" + minute+ ":" + second;
-       // iData.timeStamp = currentDate + " | " + format(hour) + ":" + format(minute);
-                
-             SimpleDateFormat sFddMMMYYYY = new SimpleDateFormat("dd-MMM-YYYY hh:mm:ss");
-             long mSecond = Long.parseLong("1000"); 
-             
-              long lFinalTicks = 0L;
-                    lFinalTicks = iData.timeInMillis * 0x3155328L;
-             
-          //   long lLTT = iData.timeInMillis* mSecond + Long.parseLong("315532800000");
-           long lLTT =     iData.timeInMillis* mSecond + Long.parseLong("315513000000");
-             LTT =sFddMMMYYYY.format(lLTT);
+                SimpleDateFormat sFddMMMYYYY = new SimpleDateFormat("dd-MMM-YYYY hh:mm:ss");
+                long mSecond = Long.parseLong("1000"); 
+
+                long lFinalTicks = 0L;
+                lFinalTicks = iData.timeInMillis * 0x3155328L;
+
+                long lLTT =     iData.timeInMillis* mSecond + Long.parseLong("315513000000");
+                LTT = sFddMMMYYYY.format(lLTT);
                 
             }catch(Exception ex){
                 DateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
@@ -860,8 +973,17 @@ public class Publisher implements Runnable {
         }
     }
 
+    private String format(int v){
+        return nF.format(v / 100.00);
+    }
+    
     private byte[] sendMarketPictureBroadcast_TCP(IData iData) throws Exception {
         boolean doBroadcast = true;
+        if (dprChangeMap.containsKey(iData.scripCode)){
+            IData iData2 = dprChangeMap.get(iData.scripCode);
+            iData.lowerCircuit = iData2.lowerCircuit;
+            iData.upperCircuit = iData2.upperCircuit;
+        }
         if (doBroadcast) {
             
             String LTT = " ";
@@ -877,7 +999,7 @@ public class Publisher implements Runnable {
                     int length = String.valueOf(iData.scripCode).length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(68 + 1 + length); 
+                    dataOut.writeByte(76 + 1 + length); 
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.lastTradedPrice);
@@ -894,7 +1016,22 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.weightedAverage);
                     dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
                     dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
+                    
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^1^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "N^^" + format(iData.lastTradedPrice) + "^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][1] + "^" + format(iData.mDepth[0][2])  + "^" + iData.mDepth[0][3] + "^";
+                        asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.openPrice) + "^";
+                        asciiData += format(iData.closePrice) + "^" + iData.totalBidQty  + "^" + iData.totalSellQty + "^";
+                        asciiData += iData.lastTradedQty + "^" + iData.tradedVolume + "^" + iData.tradedValue + "^";
+                        asciiData += "^^^^" + format(iData.weightedAverage) + "^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 case Types.iRunningExchange_FONSE:
@@ -913,7 +1050,7 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(57 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
@@ -930,8 +1067,18 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.lowPrice);
                     dataOut.writeInt(iData.openPrice);
                     dataOut.writeInt(iData.lastTradedQty);
+                    dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
                     dataOut.writeLong(iData.timeInMillis);
                     dataOut.writeByte(dScrip.isIndex ? 1 : 0);
+                    if (isAsciiRequired){
+                        String asciiHeader = "1^LIVE^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^11^4^5^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "^^^^^" + format(iData.openPrice) + "^" + format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.closePrice) + "^" + format(iData.lastTradedPrice) + "^^^" + iData.tradedVolume + "^" + iData.tradedValue + "^^^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][2] + "^" + format(iData.mDepth[0][1])  + "^" + iData.mDepth[0][3] + "^^^" + iData.lastTradedQty + "^^^" + format(iData.weightedAverage) + "^" +  iData.totalBidQty  + "^" + iData.totalSellQty + "^^^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
                     return byteArray.toByteArray();
                 }
                 default:
@@ -1073,6 +1220,16 @@ public class Publisher implements Runnable {
 
             //dataOut.writeInt(Integer.parseInt(iData.tradedValue) * 100);
             dataOut.writeLong(iData.timeInMillis);
+            if (isAsciiRequired){
+                String asciiHeader = "1^LIVE^*^4.2!" + iData.scripCode + "^";
+                String asciiData = "^10^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^5^";
+                for(int i = 0; i < 5; i++){
+                    asciiData += format(iData.mDepth[i][0]) + "^" + iData.mDepth[i][1] + "^" + iData.mDepth[i][4] + "^0^";
+                    asciiData += format(iData.mDepth[i][2]) + "^" + iData.mDepth[i][3] + "^" + iData.mDepth[i][5] + "^0^";
+                }
+                String finalData = asciiHeader + asciiData.length() + asciiData;
+                streamAscii(finalData);
+            }
             return byteArray.toByteArray();
             
         } catch (IOException e) {
@@ -1100,7 +1257,7 @@ public class Publisher implements Runnable {
             byte[] buffer = byteArray.toByteArray();
             String s = javax.xml.bind.DatatypeConverter.printBase64Binary(buffer);
             return s;
-        } catch (Exception e) {
+        } catch (IOException e) {
             return null;
         }
     }
@@ -1128,6 +1285,15 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.openPrice);
             dataOut.writeByte(tS.length);
             dataOut.write(tS);
+            if (isAsciiRequired){
+                String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                String asciiData = "^1^4^1^" + iData.timeStamp + "^" + iData.scripCode + "^";
+                asciiData += "N^^" + format(iData.lastTradedPrice) + "^^^^^^";
+                asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.openPrice) + "^";
+                asciiData += format(iData.closePrice) + "^^^^^^^^^^^^";
+                String finalData = asciiHeader + asciiData.length() + asciiData;
+                streamAscii(finalData);
+            }
             return byteArray.toByteArray();
             
         } catch (IOException e) {
@@ -1160,20 +1326,16 @@ public class Publisher implements Runnable {
         }
     }
 
-    private void stream1(String aData) {
+    private void streamAscii(String aData) {
         try {
-            if (mSocket1 == null && sPort1 <= 0) {
-                stream(aData);
-                return;
-            }
             byte[] buffer = aData.getBytes();
             DatagramPacket dPacket = new DatagramPacket(buffer, buffer.length);
-            dPacket.setAddress(sAddress);
-            dPacket.setPort(sPort1);
+            dPacket.setAddress(sAsciiAddress);
+            dPacket.setPort(sAsciiPort);
             mSocket1.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket1.send(dPacket);
-        } catch (Exception lEx) {
-            mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
+        } catch (IOException lEx) {
+            mLog.error("Unable to Stream ascii data, Detailed Msg is : " + lEx.getMessage());
         }
     }
 

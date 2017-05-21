@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.intelym.streamer.messages.curnse;
+package com.intelym.streamer.messages.nse;
 
 import com.intelym.streamer.common.CommonMessage;
 import com.intelym.streamer.common.Header;

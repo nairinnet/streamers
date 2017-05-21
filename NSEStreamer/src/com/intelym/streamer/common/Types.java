@@ -46,7 +46,8 @@ public class Types {
                             NSE_BROADCAST_INDICES_VIX = 7216,
                             NSE_ASSETPRICE_DETAILS = 7213,  
                             NSE_MBA_QUALITY_CHANGE = 7215,
-                            MBA_PRICE_CHANGE = 7216;
+                            MBA_PRICE_CHANGE = 7216,
+                            NSE_SECURITY_UPDATE_INFO = 7305;
                                     
     public static final int BC_MARKETWATCH_NSET  = 1,
                             BC_MARKETWATCH_NSEM = 2,
@@ -57,8 +58,8 @@ public class Types {
             /*Added by venkatesh for no time and no depth */
                             BC_MARKETDEPTH_NOTIME_DEPTH = 7, // 5x4
                             BC_MARKETDEPTH_NOTIME_NODEPTH = 8, // for bse_touchline_broadcast
-                            BC_MARKETDEPTH_NODEPTH_TIME = 9;
-    
+                            BC_MARKETDEPTH_NODEPTH_TIME = 9,
+                            BC_DPR_CHANGE = 11;
     public static final int NSE = 0,
                             BSE = 1,
                             NCDEX = 4,

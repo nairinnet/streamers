@@ -15,6 +15,7 @@ import com.intelym.streamer.communication.nse.NNFHeader;
 import com.intelym.streamer.config.StreamerConfiguration;
 import com.intelym.streamer.data.IData;
 import com.intelym.streamer.data.ScripData;
+import com.intelym.streamer.messages.curnse.ChangeInSecurityMaster;
 import com.intelym.streamer.messages.fonse.BroadcastTicker;
 import com.intelym.streamer.messages.nse.BroadcastIndices;
 import com.intelym.streamer.messages.nse.BroadcastMBOMBP;
@@ -141,6 +142,8 @@ public class ProcessController implements ProcessManager{
                         case Types.NSE_BROADCAST_INDICES_VIX:
                             processBroadcastIndices(in, header);
                             break;
+                        case Types.NSE_SECURITY_UPDATE_INFO:
+                            break;
                     }
                     break;
                 case Types.iRunningExchange_FONSE:
@@ -196,6 +199,15 @@ public class ProcessController implements ProcessManager{
 
     private void streamToRiwa(IData iData) {
         aPublisher.add(iData);
+    }
+    
+    public void processSecurityUpdate(NSEInputStream in, Header header){
+        try{
+            ChangeInSecurityMaster cM = new ChangeInSecurityMaster();
+            IData iData = cM.processLevel2Messages(in);
+            iData.publishCode = Types.BC_DPR_CHANGE;
+            streamToRiwa(iData);
+        }catch(Exception e){}
     }
     
     public void processBroadcastIndices(NSEInputStream in, Header header){
