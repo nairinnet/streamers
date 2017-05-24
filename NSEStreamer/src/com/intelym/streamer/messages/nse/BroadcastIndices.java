@@ -29,7 +29,7 @@ public class BroadcastIndices extends CommonMessage{
     
     public IData processLevel2Messages(NSEInputStream in) throws Exception{
         IData iData = new IData();
-        iData.scripId = toChars(in, 22).trim();
+        iData.scripId = toChars(in, 21).trim();
         iData.lastTradedPrice = in.readInt();
         iData.highPrice = in.readInt();
         iData.lowPrice = in.readInt();
