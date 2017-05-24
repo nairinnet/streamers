@@ -60,7 +60,7 @@ public class ConnectionManager {
             while((line = in.readLine())!=null){
                 String [] scripDetails = line.split(",");
                 String Group = scripDetails[0];
-                String scripCode = scripDetails[1];
+                String scripCode = scripDetails[1].trim();
                 if(scripCode != null){
                     ArrayList scripList = scripMap.get(Group);
                     if(scripList==null){

@@ -75,8 +75,13 @@ public class Publisher implements Runnable {
         nF.setGroupingUsed(false);
         try{
             indexMap = indexLoader.getIndexMap();
-            sqlUtils = new SQLUtils();
-            derivativeMappingScrips = sqlUtils.getObjectList(indexMap);
+            if(sConfiguration.getString("RIWA.Exchange") != null) {
+                if(sConfiguration.getString("RIWA.Exchange").equalsIgnoreCase(Types.sRunningExchange_FONSE) || sConfiguration.getString("RIWA.Exchange").equalsIgnoreCase(Types.sRunningExchange_CURNSE)) {
+                    sqlUtils = new SQLUtils();
+                    derivativeMappingScrips = sqlUtils.getObjectList1(indexMap);
+                }
+            }
+            
         }catch(Exception e){
             mLog.info("Unable to connect to database to load derivative scrips");
                     
@@ -287,11 +292,12 @@ public class Publisher implements Runnable {
                             }
                             break;
                         case Types.BC_MARKETWATCH_NSEM:
+                            mLog.info("iData : " + iData.scripCode);
                             buffer = sendMarketPictureBroadcast_TCP(iData);
-                            mDepthBuffer = sendMDepthDataOverBinary_TCP(iData);
                             if (buffer != null) {
                                 streamRawbuffer(buffer);
                             }
+                            mDepthBuffer = sendMDepthDataOverBinary_TCP(iData);
                             if (mDepthBuffer != null) {
                                 streamRawbuffer(mDepthBuffer);
                             }
@@ -1050,7 +1056,7 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(65 + 1 + length + 1 + 12 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
@@ -1069,6 +1075,60 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(iData.lastTradedQty);
                     dataOut.writeInt(iData.lowerCircuit);
                     dataOut.writeInt(iData.upperCircuit);
+                    dataOut.writeInt(iData.weightedAverage);
+                    dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
+                    dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
+                    dataOut.writeLong(iData.timeInMillis);
+                    dataOut.writeByte(dScrip.isIndex ? 1 : 0);
+					if (isAsciiRequired){
+                        String asciiHeader = "1^LIVE^*^4.1!" + iData.scripCode + "^";
+                        String asciiData = "^11^4^5^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                        asciiData += "^^^^^" + format(iData.openPrice) + "^" + format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.closePrice) + "^" + format(iData.lastTradedPrice) + "^^^" + iData.tradedVolume + "^" + iData.tradedValue + "^^^" + format(iData.mDepth[0][0]) + "^";
+                        asciiData += "^" + iData.mDepth[0][2] + "^" + format(iData.mDepth[0][1])  + "^" + iData.mDepth[0][3] + "^^^" + iData.lastTradedQty + "^^^" + format(iData.weightedAverage) + "^" +  iData.totalBidQty  + "^" + iData.totalSellQty + "^^^^";
+                        String finalData = asciiHeader + asciiData.length() + asciiData;
+                        streamAscii(finalData);
+                    }
+                    return byteArray.toByteArray();
+                }
+                
+                case Types.iRunningExchange_CURNSE:
+                {
+                    DerivativesScrip dScrip = derivativeMappingScrips.get(iData.scripCode);
+                    if (dScrip == null){
+                        return null;
+                    }
+                    int exchangeCode = runningExchange;
+                    ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
+                    NSEOutputStream dataOut = new NSEOutputStream(byteArray);
+                    dataOut.writeByte(111);
+                    dataOut.writeByte(exchangeCode);
+                    dataOut.writeByte(5);
+                    int length = String.valueOf(iData.scripCode).length();
+                    int usLength = dScrip.cmToken.length();
+                    //length of this packet top to bottom
+                    // entire packet + 1 byte length scripcode + length of the scripcode 
+                    dataOut.writeByte(65 + 1 + length + 1 + 12 + usLength); 
+                    
+                    dataOut.writeByte(length);
+                    dataOut.writeBytes(String.valueOf(iData.scripCode));
+                    dataOut.writeByte(usLength);
+                    dataOut.writeBytes(dScrip.cmToken);
+                    dataOut.writeInt(iData.lastTradedPrice);
+                    dataOut.writeInt(iData.closePrice);
+                    dataOut.writeInt(iData.mDepth[0][0]);
+                    dataOut.writeInt(iData.mDepth[0][1]);
+                    dataOut.writeInt(iData.mDepth[0][2]);
+                    dataOut.writeInt(iData.mDepth[0][3]);
+                    dataOut.writeInt(iData.tradedVolume);
+                    dataOut.writeInt(iData.highPrice);
+                    dataOut.writeInt(iData.lowPrice);
+                    dataOut.writeInt(iData.openPrice);
+                    dataOut.writeInt(iData.lastTradedQty);
+					dataOut.writeInt(iData.lowerCircuit);
+                    dataOut.writeInt(iData.upperCircuit);
+                    dataOut.writeInt(iData.weightedAverage);
+                    dataOut.writeInt(Double.valueOf(iData.d_totalBidQty).intValue());
+                    dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
                     dataOut.writeLong(iData.timeInMillis);
                     dataOut.writeByte(dScrip.isIndex ? 1 : 0);
                     if (isAsciiRequired){
@@ -1181,7 +1241,7 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.mDepth[0][1]);
             dataOut.writeInt(iData.mDepth[0][2]);
             dataOut.writeInt(iData.mDepth[0][3]);
-            if (exchangeCode == 0) {
+            if (exchangeCode != 1) {
                 dataOut.writeShort(iData.mDepth[0][4]);
                 dataOut.writeShort(iData.mDepth[0][5]);
             }
@@ -1189,7 +1249,7 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.mDepth[1][1]);
             dataOut.writeInt(iData.mDepth[1][2]);
             dataOut.writeInt(iData.mDepth[1][3]);
-            if (exchangeCode == 0) {
+            if (exchangeCode != 1) {
                 dataOut.writeShort(iData.mDepth[1][4]);
                 dataOut.writeShort(iData.mDepth[1][5]);
             }
@@ -1197,7 +1257,7 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.mDepth[2][1]);
             dataOut.writeInt(iData.mDepth[2][2]);
             dataOut.writeInt(iData.mDepth[2][3]);
-            if (exchangeCode == 0) {
+            if (exchangeCode != 1) {
                 dataOut.writeShort(iData.mDepth[2][4]);
                 dataOut.writeShort(iData.mDepth[2][5]);
             }
@@ -1205,7 +1265,7 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.mDepth[3][1]);
             dataOut.writeInt(iData.mDepth[3][2]);
             dataOut.writeInt(iData.mDepth[3][3]);
-            if (exchangeCode == 0) {
+            if (exchangeCode != 1) {
                 dataOut.writeShort(iData.mDepth[3][4]);
                 dataOut.writeShort(iData.mDepth[3][5]);
             }
@@ -1213,7 +1273,7 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.mDepth[4][1]);
             dataOut.writeInt(iData.mDepth[4][2]);
             dataOut.writeInt(iData.mDepth[4][3]);
-            if (exchangeCode == 0) {
+            if (exchangeCode != 1) {
                 dataOut.writeShort(iData.mDepth[4][4]);
                 dataOut.writeShort(iData.mDepth[4][5]);
             }
@@ -1268,24 +1328,28 @@ public class Publisher implements Runnable {
         NSEOutputStream dataOut = new NSEOutputStream(byteArray);
 
         try {
-            byte[] tS = iData.timeStamp.getBytes();
+            //byte[] tS = iData.timeStamp.getBytes();
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
+            
             int length = iData.scripId.length();
             //length of this packet top to bottom
             // entire packet + 1 byte length scripcode + length of the scripcode  + 1 byte length timestamp + length of the timestamp
-            dataOut.writeByte(20 + 1 + length + 1 + tS.length); 
+
+            //dataOut.writeByte(26 + length + tS.length); 
+            //mLog.info(iData.scripId.toUpperCase());
+            dataOut.writeByte(34 + length); 
             dataOut.writeByte(length);
-            dataOut.writeBytes(String.valueOf(iData.scripId));
+            dataOut.writeBytes(String.valueOf(iData.scripId).toUpperCase());
             dataOut.writeInt(iData.lastTradedPrice);
             dataOut.writeInt(iData.closePrice);
             dataOut.writeInt(iData.highPrice);
             dataOut.writeInt(iData.lowPrice);
             dataOut.writeInt(iData.openPrice);
-            dataOut.writeByte(tS.length);
-            dataOut.write(tS);
-            if (isAsciiRequired){
+            //dataOut.writeByte(tS.length);
+            dataOut.writeLong(iData.timeInMillis);
+			if (isAsciiRequired){
                 String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
                 String asciiData = "^1^4^1^" + iData.timeStamp + "^" + iData.scripCode + "^";
                 asciiData += "N^^" + format(iData.lastTradedPrice) + "^^^^^^";

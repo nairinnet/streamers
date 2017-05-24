@@ -12,6 +12,10 @@ import com.intelym.logger.LoggerFactory;
 import com.intelym.logger.RiwaLogger;
 import com.intelym.streamer.common.Constants;
 import com.intelym.streamer.common.IndicesInfo;
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.HashMap;
 
 /**
@@ -47,8 +51,54 @@ public final class SQLUtils {
         sDbUser = tmp;
         tmp = engineConfiguration.getString(Constants.STREAMER_DB_PWD);
         sDbPwd = tmp;
-        streamerConnectionPool = ConnectionPool.newInstance(3, 1, sDbUrl, sDbUser, sDbPwd, sDbDriver);
+        //streamerConnectionPool = ConnectionPool.newInstance(3, 1, sDbUrl, sDbUser, sDbPwd, sDbDriver);
     }
+    
+    public HashMap<Integer, DerivativesScrip>  getObjectList1(HashMap<String, IndicesInfo> indexMap) {
+        HashMap<Integer, DerivativesScrip> scripMap = new HashMap<>();
+        String csvFile = "src/conf/contract.csv";
+        BufferedReader br = null;
+        String line = "";
+        String cvsSplitBy = ",";
+        try{
+            br = new BufferedReader(new FileReader(csvFile));
+            while ((line = br.readLine()) != null) {
+
+                  // use comma as separator
+                  String[] cm_fo_mapping = line.split(cvsSplitBy);
+                  
+                  String ebaStockcode = cm_fo_mapping[0];
+                  String exchangeCode = cm_fo_mapping[1];
+                  int cmToken;
+                  String tmp = cm_fo_mapping[2].trim();
+                  boolean isIndex = false;
+                  //mLog.info("Mapping [ebaStockcode= " + cm_fo_mapping[1] + " , exchangeCode= " + cm_fo_mapping[2] + "cm_fo_Code= " + cm_fo_mapping[3].trim() + "]");
+                  try{
+                            cmToken = Integer.parseInt(tmp);
+                    }catch(NumberFormatException e){
+                        isIndex = true;
+                    }
+                  
+                int focmToken = Integer.parseInt(cm_fo_mapping[3].trim());
+                DerivativesScrip dScrip = new DerivativesScrip();
+                dScrip.ebaStockCode = ebaStockcode;
+                dScrip.exchangeCode = exchangeCode;
+                dScrip.cmToken = tmp;
+                dScrip.focmToken = focmToken;
+                dScrip.isIndex = isIndex;
+                scripMap.put(focmToken, dScrip);
+
+              }  
+        } catch (FileNotFoundException e) {
+            //
+        } catch (IOException e) {
+            //
+        }
+
+            return scripMap;
+    	
+    }
+
     
     public HashMap<Integer, DerivativesScrip>  getObjectList(HashMap<String, IndicesInfo> indexMap) {
         HashMap<Integer, DerivativesScrip> scripMap = new HashMap<>();
@@ -75,6 +125,7 @@ public final class SQLUtils {
                             isIndex = true;
                         }
                         int focmToken = rs.getInt(4);
+                        mLog.info("focmToken : " + focmToken);
                         DerivativesScrip dScrip = new DerivativesScrip();
                         dScrip.ebaStockCode = ebaStockcode;
                         dScrip.exchangeCode = exchangeCode;
@@ -100,6 +151,7 @@ public final class SQLUtils {
             validateAndCloseConection(connection,streamerConnectionPool);
             return null;
     	}
+        
     }
     
     private void validateAndCloseConection(Connection connection ,ConnectionPool poolType)  {

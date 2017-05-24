@@ -143,6 +143,7 @@ public class ProcessController implements ProcessManager{
                             processBroadcastIndices(in, header);
                             break;
                         case Types.NSE_SECURITY_UPDATE_INFO:
+                            processSecurityUpdate(in, header);
                             break;
                     }
                     break;
@@ -167,6 +168,9 @@ public class ProcessController implements ProcessManager{
                         case Types.NSE_BROADCAST_INDICES:
                             processBroadcastIndices(in, header);
                             break;
+                        case Types.NSE_SECURITY_UPDATE_INFO:
+                            processSecurityUpdate_DERIVATIVE(in, header);
+                            break;
                     }
                     break;
                 case Types.iRunningExchange_CURNSE:
@@ -187,6 +191,9 @@ public class ProcessController implements ProcessManager{
                         case Types.NSE_ONLY_MBP:
                           //  processOnlyMBP(in, header);
                             processOnlyMBP_FONSE(in, header);
+                            break;
+                        case Types.NSE_SECURITY_UPDATE_INFO:
+                            processSecurityUpdate_DERIVATIVE(in, header);
                             break;
                     }
                     break;
@@ -210,6 +217,15 @@ public class ProcessController implements ProcessManager{
         }catch(Exception e){}
     }
     
+    public void processSecurityUpdate_DERIVATIVE(NSEInputStream in, Header header){
+        try{
+            ChangeInSecurityMaster cM = new ChangeInSecurityMaster();
+            IData iData = cM.processLevel2Messages_DERIVATIVE(in);
+            iData.publishCode = Types.BC_DPR_CHANGE;
+            streamToRiwa(iData);
+        }catch(Exception e){}
+    }
+    
     public void processBroadcastIndices(NSEInputStream in, Header header){
         try{
             BroadcastIndices bMBO = new BroadcastIndices();
@@ -217,6 +233,8 @@ public class ProcessController implements ProcessManager{
             for(int i = 0; i < iData.noOfRecords; i++){
                 IData iData2 = bMBO.processLevel2Messages(in);
                 iData2.publishCode = Types.BC_INDEX;
+                iData2.timeStamp = header.timeStamp;
+                iData2.timeInMillis = header.logTime;
                 streamToRiwa(iData2);
             }
         }catch(Exception e){
