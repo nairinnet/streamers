@@ -119,12 +119,19 @@ public final class SQLUtils {
                         int cmToken;
                         String tmp = rs.getString(3);
                         boolean isIndex = false;
+                        boolean isFuture = false;
                         try{
                             cmToken = Integer.parseInt(tmp);
                         }catch(NumberFormatException e){
                             isIndex = true;
                         }
                         int focmToken = rs.getInt(4);
+                        String instrumentType = rs.getString(5);
+                        if (instrumentType != null){
+                            if (instrumentType.toUpperCase().startsWith("FUT")){
+                                isFuture = true;
+                            }
+                        }
                         mLog.info("focmToken : " + focmToken);
                         DerivativesScrip dScrip = new DerivativesScrip();
                         dScrip.ebaStockCode = ebaStockcode;
@@ -132,6 +139,7 @@ public final class SQLUtils {
                         dScrip.cmToken = tmp;
                         dScrip.focmToken = focmToken;
                         dScrip.isIndex = isIndex;
+                        dScrip.isFuture = isFuture;
                         scripMap.put(focmToken, dScrip);
                     }
                    

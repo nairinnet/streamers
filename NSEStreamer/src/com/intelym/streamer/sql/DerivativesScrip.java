@@ -17,5 +17,6 @@ public class DerivativesScrip {
     public int  focmToken = -1;
                 
     
-    public boolean isIndex = false;
+    public boolean  isIndex = false,
+                    isFuture = false;
 }

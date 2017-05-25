@@ -516,12 +516,13 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(66 + 1 + length + 1 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeByte(usLength);
                     dataOut.writeBytes(dScrip.cmToken);
+                    dataOut.writeByte(dScrip.isFuture ? 1 : 0);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -717,12 +718,13 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(65 + 1 + length + 1 + usLength); 
+                    dataOut.writeByte(66 + 1 + length + 1 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeByte(usLength);
                     dataOut.writeBytes(dScrip.cmToken);
+                    dataOut.writeByte(dScrip.isFuture ? 1 : 0);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -1056,12 +1058,13 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(65 + 1 + length + 1 + 12 + usLength); 
+                    dataOut.writeByte(66 + 1 + length + 1 + 12 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeByte(usLength);
                     dataOut.writeBytes(dScrip.cmToken);
+                    dataOut.writeByte(dScrip.isFuture ? 1 : 0);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
