@@ -12,37 +12,40 @@ import twitter4j.TwitterFactory;
 import twitter4j.conf.ConfigurationBuilder;
 public class TwitterService {
 
-//public TwitterFactory tf; 
-	TwitterFactory tf = null;
+	TwitterFactory tFactory = null;
 	static int x = 0;	
 	
+	/**
+	 * Initialize with configuration
+	 */
 	public TwitterService(){
-		ConfigurationBuilder cb = new ConfigurationBuilder();
-		cb.setDebugEnabled(true)
-		  .setOAuthConsumerKey("1nIbdh8pLNcmKSdktTRPpn4oi")
-		  .setOAuthConsumerSecret("DybFYw5qLlVcXgm613ovZmHcircKSGK37lBVSb8DfxKZnMQwMI")
-		  .setOAuthAccessToken("871983932182581248-nVwrXreKdhhSre91ce2RE9OQkOYFQBx")
-		  .setOAuthAccessTokenSecret("oPXU9laqYVSJYtZyIL0fuF4kgDexWxQRkhIxMMndO1PAD");
-		tf = new TwitterFactory(cb.build());
+		ConfigurationBuilder cBuilder = new ConfigurationBuilder();
+		cBuilder.setDebugEnabled(true)
+		  .setOAuthConsumerKey("*************************")
+		  .setOAuthConsumerSecret("************************************")
+		  .setOAuthAccessToken("********************************************")
+		  .setOAuthAccessTokenSecret("****************************************");
+		tFactory = new TwitterFactory(cBuilder.build());
 	}
 		
-	
+	/**
+	 * Get List of Twits by key
+	 * @param key
+	 * @return
+	 */
 	public ArrayList<Status> getListOfTwits(String key){
-		Twitter twitter = tf.getInstance();
+		Twitter twitter = tFactory.getInstance();
 		ArrayList<Status> statusList = new ArrayList<Status>();
 
 		  try {
 	            Query query = new Query(key);
-	            /*query.setSince("2017-06-07");
-	            query.setUntil("2013-07-07");
-	            query.geoCode(new GeoLocation(XXX, XXX), 200, Query.KILOMETERS);*/
+	           
 	            QueryResult result;
 	           
 	            do {
 	            	
 	                result = twitter.search(query);
 	                
-	               
 	                List<Status> tweets = result.getTweets();
 	               
 	                for (Status tweet : tweets) {
@@ -60,21 +63,20 @@ public class TwitterService {
 		  return statusList;
 	}
 	
-	
-	public ArrayList<Status> getTopTwits(Paging paging) throws TwitterException{
-		Twitter twitter = tf.getInstance();
+	/**
+	 * Get Twits by Page number and number of twits count
+	 * @param paging
+	 * @return
+	 * @throws TwitterException
+	 */
+	public ArrayList<Status> getTwitsByPage(Paging paging) throws TwitterException{
+		Twitter twitter = tFactory.getInstance();
 		
-		//ResponseList<Status> a = twitter.getUserTimeline(new Paging(1,5));
 		ArrayList<Status> statusList = new ArrayList<Status>();
 
 		  try {
-	            //Query query = new Query(key);
-	          //  QueryResult result;
 	          
         	ResponseList<Status> tweets = twitter.getUserTimeline(paging);
-            //result = twitter.search(query);
-           
-            //List<Status> tweets = result.getTweets();
            
             for (Status tweet : tweets) {
             	statusList.add(tweet);

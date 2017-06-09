@@ -11,21 +11,18 @@ public class TwitterClient {
 	 public static void main(String[] args) throws TwitterException {
 		 TwitterService tInfo = new TwitterService();
 		 
-		 ArrayList<Status> list = tInfo.getListOfTwits("AkshayMhasekar");
-		
-		 
-		
+		//Search Twits by key
+		ArrayList<Status> list = tInfo.getListOfTwits("AkshayMhasekar");
 		for (Status tweet : list) {
 			
 			  System.out.println("@" + tweet.getUser().getScreenName() + " - " + tweet.getText());
-	        }
+		}
 		
-		 ArrayList<Status> Count = tInfo.getTopTwits(new Paging(1,1));
-		 
-			for(Status tCount:Count){
-					System.out.println(tCount.getText());
-					
-				}
+		//Get list by page
+		ArrayList<Status> Count = tInfo.getTwitsByPage(new Paging(1,2));
+		for(Status tCount:Count){
+				System.out.println(tCount.getText());
+		}
 			 
 		 }
 		 
