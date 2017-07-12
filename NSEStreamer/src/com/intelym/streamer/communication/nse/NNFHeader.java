@@ -27,10 +27,11 @@ public class NNFHeader extends CommonMessage{
             header.messageCode = in.readShort();
             header.errorCode = in.readShort();
             header.bcSeqNo = in.readInt();
-            skipBytes(in, 4);
+            in.readInt();
             header.timeStamp = toChars(in, 8);
             skipBytes(in, 8);
             header.messageLength = in.readShort();
+            
         }catch(Exception e){}
         return header;
     }

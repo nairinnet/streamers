@@ -24,14 +24,18 @@ public class ChangeInSecurityMaster extends CommonMessage{
         
     }
     
-    public IData processLevel2Messages_DERIVATIVE(NSEInputStream in){
+    public IData processLevel2Messages_DERIVATIVE(NSEInputStream in) throws Exception{
         IData iData = new IData();
         try{
             iData.scripCode = in.readInt();  //token
-            //in.skipBytes(144); // skip until DPR
-            in.skipBytes(135); // skip until DPR
+            
+            in.skipBytes(148); // skip until DPR
             iData.lowerCircuit = in.readInt();
             iData.upperCircuit = in.readInt();
+//            if (iData.lowerCircuit != 0 || iData.upperCircuit != 0) {
+//                System.out.println("scripCode : " + iData.scripCode + " Circuit :: " + iData.lowerCircuit + " : " + iData.upperCircuit); 
+//            }
+            
             in.skipBytes(in.available());
             
         }catch(IOException e){

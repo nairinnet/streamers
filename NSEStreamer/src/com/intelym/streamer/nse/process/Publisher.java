@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -60,6 +61,9 @@ public class Publisher implements Runnable {
     private int runningExchange = -1;
     private IndexLoader indexLoader = null;
     private boolean isAsciiRequired = false;
+    
+    private boolean isAdditionalOutputEnabled = false;
+    private List<AdditionalIps> additionalIps = null;
 
     public Publisher(StreamerConfiguration aConfiguration, TreeMap sMap, TreeMap iMap, TreeMap sTimeBasedScrip) { // Modified by Nirmal
         scripsMap = sMap;
@@ -78,7 +82,12 @@ public class Publisher implements Runnable {
             if(sConfiguration.getString("RIWA.Exchange") != null) {
                 if(sConfiguration.getString("RIWA.Exchange").equalsIgnoreCase(Types.sRunningExchange_FONSE) || sConfiguration.getString("RIWA.Exchange").equalsIgnoreCase(Types.sRunningExchange_CURNSE)) {
                     sqlUtils = new SQLUtils();
-                    derivativeMappingScrips = sqlUtils.getObjectList1(indexMap);
+                    if (sConfiguration.getString(Constants.CSV_FILE).equalsIgnoreCase("NO")) {
+                        derivativeMappingScrips = sqlUtils.getObjectList(indexMap);
+                    } else {
+                        derivativeMappingScrips = sqlUtils.getObjectListFromFile(indexMap);
+                    }
+                    
                 }
             }
             
@@ -118,7 +127,25 @@ public class Publisher implements Runnable {
             }
         }
         
-        
+        try{
+        tmp = sConfiguration.getString("RIWA.AdditionalOutputs");
+        if(tmp.equalsIgnoreCase("true")){
+            this.isAdditionalOutputEnabled = true;
+            tmp = sConfiguration.getString("RIWA.AdditionalOutputAddress");
+            String[] tmpArray = tmp.split("\\,");
+            additionalIps = new ArrayList<>();
+            for(String ips : tmpArray){
+                String[] ipsAndPorts = ips.split("\\:");
+                AdditionalIps aIps = new AdditionalIps();
+                aIps.additionalIp = InetAddress.getByName(ipsAndPorts[0].trim());
+                aIps.additionalPort = Integer.valueOf(ipsAndPorts[1].trim());
+                additionalIps.add(aIps);
+            }
+        }
+        }catch(Exception e){
+            mLog.error("Unable to add additional ips for multiple outputs " + e.getMessage());
+            
+        }
     }
 
     
@@ -215,14 +242,16 @@ public class Publisher implements Runnable {
     public void run() {
         try {
             while (isRunning) {
-                try {
-                    IData iData = publisherQueue.poll(100l, TimeUnit.NANOSECONDS);
+                //try {
+                    //IData iData = publisherQueue.poll(100l, TimeUnit.NANOSECONDS);
+                    IData iData = publisherQueue.poll(10, TimeUnit.MILLISECONDS);
+                    //IData iData = publisherQueue.poll();
                     if (iData != null) {
                         publishData(iData);
                     }
                     // publisherQueue.wait();
-                } catch (InterruptedException e) {
-                }
+//                } catch (InterruptedException e) {
+//                }
             }
         } catch (Exception e) {
             isRunning = false;
@@ -292,7 +321,7 @@ public class Publisher implements Runnable {
                             }
                             break;
                         case Types.BC_MARKETWATCH_NSEM:
-                            mLog.info("iData : " + iData.scripCode);
+                            //mLog.info("iData : " + iData.scripCode);
                             buffer = sendMarketPictureBroadcast_TCP(iData);
                             if (buffer != null) {
                                 streamRawbuffer(buffer);
@@ -1083,7 +1112,7 @@ public class Publisher implements Runnable {
                     dataOut.writeInt(Double.valueOf(iData.d_totalSellQty).intValue());
                     dataOut.writeLong(iData.timeInMillis);
                     dataOut.writeByte(dScrip.isIndex ? 1 : 0);
-					if (isAsciiRequired){
+                    if (isAsciiRequired){
                         String asciiHeader = "1^LIVE^*^4.1!" + iData.scripCode + "^";
                         String asciiData = "^11^4^5^" + iData.timeInMillis + "^" + iData.scripCode + "^";
                         asciiData += "^^^^^" + format(iData.openPrice) + "^" + format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.closePrice) + "^" + format(iData.lastTradedPrice) + "^^^" + iData.tradedVolume + "^" + iData.tradedValue + "^^^" + format(iData.mDepth[0][0]) + "^";
@@ -1110,12 +1139,13 @@ public class Publisher implements Runnable {
                     int usLength = dScrip.cmToken.length();
                     //length of this packet top to bottom
                     // entire packet + 1 byte length scripcode + length of the scripcode 
-                    dataOut.writeByte(65 + 1 + length + 1 + 12 + usLength); 
+                    dataOut.writeByte(66 + 1 + length + 1 + 12 + usLength); 
                     
                     dataOut.writeByte(length);
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeByte(usLength);
                     dataOut.writeBytes(dScrip.cmToken);
+                    dataOut.writeByte(dScrip.isFuture ? 1 : 0);
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
                     dataOut.writeInt(iData.mDepth[0][0]);
@@ -1375,6 +1405,13 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
+            if (this.isAdditionalOutputEnabled){
+                for(AdditionalIps aIps : additionalIps){
+                    dPacket.setAddress(aIps.additionalIp);
+                    dPacket.setPort(aIps.additionalPort);
+                    mSocket.send(dPacket);
+                }
+            }
         } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
@@ -1388,6 +1425,13 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
+            if (this.isAdditionalOutputEnabled){
+                for(AdditionalIps aIps : additionalIps){
+                    dPacket.setAddress(aIps.additionalIp);
+                    dPacket.setPort(aIps.additionalPort);
+                    mSocket.send(dPacket);
+                }
+            }
         } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
@@ -1410,7 +1454,10 @@ public class Publisher implements Runnable {
         public static final int timeToLive = 5;
     }
 
-    
+    class AdditionalIps{
+        public InetAddress additionalIp;
+        public int additionalPort;
+    }
    
    
 }

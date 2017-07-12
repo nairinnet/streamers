@@ -24,5 +24,6 @@ public class Constants {
      public static final String  STREAMER_DB_DRIVER = "STREAMER_DB_DRIVER",
                                 STREAMER_DB_URL = "STREAMER_DB_URL",
                                 STREAMER_DB_UID = "STREAMER_DB_UID",
-                                STREAMER_DB_PWD = "STREAMER_DB_PWD";
+                                STREAMER_DB_PWD = "STREAMER_DB_PWD",
+                                CSV_FILE = "CSV_FILE";
 }

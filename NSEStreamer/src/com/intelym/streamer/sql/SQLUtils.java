@@ -34,7 +34,7 @@ public final class SQLUtils {
     public SQLUtils() throws Exception{
         engineConfiguration = StreamerConfiguration.getInstance();
         
-        String tmp = tmp = engineConfiguration.getString(Constants.STREAMER_DB_DRIVER);
+        String tmp = engineConfiguration.getString(Constants.STREAMER_DB_DRIVER);
         if(tmp == null || tmp.length() == 0){
             throw new Exception("Driver not found");
         }
@@ -51,10 +51,12 @@ public final class SQLUtils {
         sDbUser = tmp;
         tmp = engineConfiguration.getString(Constants.STREAMER_DB_PWD);
         sDbPwd = tmp;
-        //streamerConnectionPool = ConnectionPool.newInstance(3, 1, sDbUrl, sDbUser, sDbPwd, sDbDriver);
+        if(engineConfiguration.getString(Constants.CSV_FILE).equalsIgnoreCase("NO")) {
+            streamerConnectionPool = ConnectionPool.newInstance(3, 1, sDbUrl, sDbUser, sDbPwd, sDbDriver);
+        }
     }
     
-    public HashMap<Integer, DerivativesScrip>  getObjectList1(HashMap<String, IndicesInfo> indexMap) {
+    public HashMap<Integer, DerivativesScrip>  getObjectListFromFile(HashMap<String, IndicesInfo> indexMap) {
         HashMap<Integer, DerivativesScrip> scripMap = new HashMap<>();
         String csvFile = "src/conf/contract.csv";
         BufferedReader br = null;
@@ -72,6 +74,7 @@ public final class SQLUtils {
                   int cmToken;
                   String tmp = cm_fo_mapping[2].trim();
                   boolean isIndex = false;
+		  boolean isFuture = false;
                   //mLog.info("Mapping [ebaStockcode= " + cm_fo_mapping[1] + " , exchangeCode= " + cm_fo_mapping[2] + "cm_fo_Code= " + cm_fo_mapping[3].trim() + "]");
                   try{
                             cmToken = Integer.parseInt(tmp);
@@ -80,12 +83,19 @@ public final class SQLUtils {
                     }
                   
                 int focmToken = Integer.parseInt(cm_fo_mapping[3].trim());
+		String instrumentType = cm_fo_mapping[4].trim();
+                        if (instrumentType != null){
+                            if (instrumentType.toUpperCase().startsWith("FUT")){
+                                isFuture = true;
+                            }
+                        }
                 DerivativesScrip dScrip = new DerivativesScrip();
                 dScrip.ebaStockCode = ebaStockcode;
                 dScrip.exchangeCode = exchangeCode;
                 dScrip.cmToken = tmp;
                 dScrip.focmToken = focmToken;
                 dScrip.isIndex = isIndex;
+		dScrip.isFuture = isFuture;
                 scripMap.put(focmToken, dScrip);
 
               }  
