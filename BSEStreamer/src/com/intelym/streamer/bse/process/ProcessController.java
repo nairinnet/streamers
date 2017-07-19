@@ -44,7 +44,7 @@ public class ProcessController implements ProcessManager {
             eConfiguration = StreamerConfiguration.newInstance(config);
             mLog.info("Streamer configuration reading is completed....");
 
-            TreeMap<String, IndicesInfo> indexMap;
+            //TreeMap<String, IndicesInfo> indexMap;
             String tmp = eConfiguration.getString("RIWA.Streamer.DiffTimeout");
             if (tmp != null) {
                 differenceTime = Integer.parseInt(tmp);
@@ -156,7 +156,8 @@ public class ProcessController implements ProcessManager {
             if (iBroadcast.isLevel2Available()) {
                 for (int i = 0; i < iData.noOfRecords; i++) {
                     IData iData2 = iBroadcast.processLevel2Messages(in);
-                    iData2.timeStamp = iData.timeStamp;
+                    //iData2.timeStamp = iData.timeStamp;
+                    iData2.timeInMillis = iData.timeInMillis;
                     iData2.tradingSession = iData.tradingSession;
                     if (lastAvailableSession > 4 && iData2.tradingSession == 4) {
                         continue;
@@ -203,7 +204,7 @@ public class ProcessController implements ProcessManager {
         if (mBroadcast.isLevel2Available()) {
             for (int i = 0; i < iData.noOfRecords; i++) {
                 IData iData2 = mBroadcast.processLevel2Messages(in);
-                iData2.timeStamp = iData.timeStamp;
+                //iData2.timeStamp = iData.timeStamp;
                 //iData2.tradingSession = iData.tradingSession;
                 iData2.timeInMillis = iData.timeInMillis;
                 iData2.publishCode = Types.BC_MARKETWATCH_BSEM;
@@ -211,7 +212,7 @@ public class ProcessController implements ProcessManager {
                 if (iData2.tradingSession == 0 || iData2.tradingSession == 7) {
                     continue;
                 }
-                if (iData.lastTradedPrice <= 0) {
+                if (iData2.lastTradedPrice <= 0) {
                     continue;
                 }
                 ScripData tmpScrip = allScripsMap.get(iData2.scripCode);

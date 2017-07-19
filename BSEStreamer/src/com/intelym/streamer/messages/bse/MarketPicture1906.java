@@ -68,7 +68,7 @@ public class MarketPicture1906 extends BroadcastMessages {
         iData.weightedAverage = readInt(in);
         int noOfRecords = 5;
         iData.mDepth06 = new int[5][4];
-        for (int i = 0; i <= noOfRecords; i++) {
+        for (int i = 0; i < noOfRecords; i++) {
             iData.mDepth06[i][0] = readInt(in);
             iData.mDepth06[i][1] = readInt(in);
             iData.mDepth06[i][2] = readInt(in);

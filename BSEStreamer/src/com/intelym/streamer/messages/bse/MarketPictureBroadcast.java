@@ -7,6 +7,7 @@ package com.intelym.streamer.messages.bse;
 import com.intelym.streamer.communication.BSEInputStream;
 import com.intelym.streamer.data.IData;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 
 /**
@@ -35,9 +36,9 @@ public class MarketPictureBroadcast extends BroadcastMessages{
         skipBytes(in, 6);
         Date aDate = new Date();
         iData.timeInMillis = aDate.getTime();
-        String currentDate = sF.format(aDate);
-        iData.timeStamp = currentDate + " | " + format(hour) + ":" + format(minute);
-     //   iData.timeStamp = currentDate + " " + hour + ":" + minute+ ":" + second;
+        //String currentDate = sF.format(aDate);
+        //iData.timeStamp = currentDate + " " + format(hour) + ":" + format(minute) + ":" + format(second);
+        //iData.timeStamp = currentDate + " " + hour + ":" + minute+ ":" + second;
         iData.noOfRecords = readShort(in);
         return iData;
     }

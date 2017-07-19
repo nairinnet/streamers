@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -30,27 +31,33 @@ public class Publisher implements Runnable {
 
     private static final QuickLogger mLog = LoggerFactory.getLogger(Publisher.class);
     private StreamerConfiguration sConfiguration;
-    private MulticastSocket mSocket;
+    private MulticastSocket mSocket, mAsciiSocket;
     private MulticastSocket mSocket1;
-    private int sPort = 7000;
+    private int sPort = 7000, sAsciiPort = 7001;
     private int sPort1 = 0;
-    private InetAddress sAddress = null;
-    private InetAddress sBindAddress = null;
+    private InetAddress sAddress = null, sAsciiAddress = null;
+    private InetAddress sBindAddress = null, sAsciiBindAddress = null;
     private boolean sMulticast = false;
     private boolean isRunning = false;
     private Thread streamThread = null;
     private long delayTimeDifference;
     private int outputType = 1; //1 is TCP and 2 is WS       
     private final LinkedBlockingQueue<IData> publisherQueue;
+    private NumberFormat nF;
     private HashMap<String, IndicesInfo> indexMap;
     private final TreeMap<Integer, ScripData> scripsMap;
     private IndexLoader indexLoader = null;
+    private boolean isAsciiRequired = false;
 
     public Publisher(StreamerConfiguration aConfiguration, TreeMap sMap) {
         scripsMap = sMap;
         sConfiguration = aConfiguration;
         publisherQueue = new LinkedBlockingQueue();
         indexLoader = new IndexLoader();
+        nF = NumberFormat.getInstance();
+        nF.setMinimumFractionDigits(2);
+        nF.setMaximumFractionDigits(2);
+        nF.setGroupingUsed(false);
         String tmp = sConfiguration.getString("RIWA.Output.Type");
         if (tmp != null) {
             switch (tmp) {
@@ -149,18 +156,35 @@ public class Publisher implements Runnable {
 
             streamThread = new Thread(this, "RIWA.StreamThread");
 
-            if (port1 != null & !port1.equals("")) {
-                sPort1 = Integer.parseInt(port1);
+//            if (port1 != null & !port1.equals("")) {
+//                sPort1 = Integer.parseInt(port1);
+//            }
+//
+//            if (sPort1 > 0) {
+//                mSocket1 = new MulticastSocket();
+//            }
+            String tmp = sConfiguration.getString("RIWA.AsciiOutputEnabled");
+            if (tmp != null && tmp.equalsIgnoreCase("true")){
+                isAsciiRequired = true;
+                tmp = sConfiguration.getString("RIWA.AsciiOutputAddress");
+                sAsciiAddress = InetAddress.getByName(tmp);
+                tmp = sConfiguration.getString("RIWA.AsciiStreamPort");
+                sAsciiPort = Integer.parseInt(tmp);
+                bindAddress = sConfiguration.getString("RIWA.AsciiStreamBindAddress");
+                if (bindAddress != null) {
+                    sAsciiBindAddress = InetAddress.getByName(bindAddress);
+                }
+                mAsciiSocket = new MulticastSocket();
             }
-
-            if (sPort1 > 0) {
-                mSocket1 = new MulticastSocket();
-            }
+            
             isRunning = true;
             streamThread.start();
             mLog.info("RIWA.Stream queue started successfully....");
         } catch (IOException | NumberFormatException e) {
             mLog.error("RIWA Publisher Died, Detailed Msg is : " + e.getMessage());
+            return false;
+        }catch (Exception e) {
+            mLog.error("Other Exception : " + e.getMessage());
             return false;
         }
         return true;
@@ -185,7 +209,7 @@ public class Publisher implements Runnable {
     @Override
     public void run() {
         try {
-            while (isRunning) {
+            while (isRunning) {   
                 try {
                     IData iData = publisherQueue.poll(100l, TimeUnit.NANOSECONDS);
                     if (iData != null) {
@@ -334,11 +358,11 @@ public class Publisher implements Runnable {
             dataOut.writeByte(length);
             dataOut.writeBytes(String.valueOf(iData.scripCode));
             dataOut.writeInt(iData.lastTradedPrice);
-            dataOut.writeInt(iData.closePrice);
-            dataOut.writeInt(iData.mDepth[0][0]);
-            dataOut.writeInt(iData.mDepth[0][1]);
-            dataOut.writeInt(iData.mDepth[0][2]);
-            dataOut.writeInt(iData.mDepth[0][3]);
+            dataOut.writeInt(iData.closePrice == 0 ? iData.prevClosePrice : iData.closePrice);
+            dataOut.writeInt(iData.mDepth[0][0]); //BestBuyPrice
+            dataOut.writeInt(iData.mDepth[0][1]); //BestBuyQty
+            dataOut.writeInt(iData.mDepth[0][3]); //BestSellPrice
+            dataOut.writeInt(iData.mDepth[0][4]); //BestSellQty :: BestOfferQty
             dataOut.writeInt(iData.tradedVolume);
             dataOut.writeInt(iData.highPrice);
             dataOut.writeInt(iData.lowPrice);
@@ -350,6 +374,18 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.lowerCircuit);
             dataOut.writeInt(iData.upperCircuit);
             dataOut.writeLong(iData.timeInMillis);
+            if (isAsciiRequired){
+                String asciiHeader = "1^15MIN^*^4.1!" + iData.scripCode + "^";
+                String asciiData = "^1^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^";
+                asciiData += "N^^" + format(iData.lastTradedPrice) + "^" + format(iData.mDepth[0][0]) + "^";
+                asciiData += "^" + iData.mDepth[0][1] + "^" + format(iData.mDepth[0][2])  + "^" + iData.mDepth[0][3] + "^";
+                asciiData += format(iData.highPrice) + "^" + format(iData.lowPrice) + "^" + format(iData.openPrice) + "^";
+                asciiData += format(iData.closePrice) + "^" + iData.totalBidQty  + "^" + iData.totalSellQty + "^";
+                asciiData += iData.lastTradedQty + "^" + iData.tradedVolume + "^" + iData.tradedValue + "^";
+                asciiData += "^^^^" + format(iData.weightedAverage) + "^^";
+                String finalData = asciiHeader + asciiData.length() + asciiData;
+                streamAscii(finalData);
+            }
             return byteArray.toByteArray();
         } else {
             return null;
@@ -365,32 +401,58 @@ public class Publisher implements Runnable {
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(4);
             int length = String.valueOf(iData.scripCode).length();
-            dataOut.writeByte(93 + 1 + length);
+           
+            dataOut.writeByte(93 + 1 + 40 + length);
             dataOut.writeByte(length);
             dataOut.writeBytes(String.valueOf(iData.scripCode));
             dataOut.writeByte(5); // no of records
             dataOut.writeInt(iData.mDepth[0][0]);
             dataOut.writeInt(iData.mDepth[0][1]);
-            dataOut.writeInt(iData.mDepth[0][2]);
             dataOut.writeInt(iData.mDepth[0][3]);
+            dataOut.writeInt(iData.mDepth[0][4]);
+            dataOut.writeInt(iData.mDepth[0][2]);
+            dataOut.writeInt(iData.mDepth[0][5]);
+            
             dataOut.writeInt(iData.mDepth[1][0]);
             dataOut.writeInt(iData.mDepth[1][1]);
-            dataOut.writeInt(iData.mDepth[1][2]);
             dataOut.writeInt(iData.mDepth[1][3]);
+            dataOut.writeInt(iData.mDepth[1][4]);
+            dataOut.writeInt(iData.mDepth[1][2]);
+            dataOut.writeInt(iData.mDepth[1][5]);
+            
             dataOut.writeInt(iData.mDepth[2][0]);
             dataOut.writeInt(iData.mDepth[2][1]);
-            dataOut.writeInt(iData.mDepth[2][2]);
             dataOut.writeInt(iData.mDepth[2][3]);
+            dataOut.writeInt(iData.mDepth[2][4]);
+            dataOut.writeInt(iData.mDepth[2][2]);
+            dataOut.writeInt(iData.mDepth[2][5]);
+            
             dataOut.writeInt(iData.mDepth[3][0]);
             dataOut.writeInt(iData.mDepth[3][1]);
-            dataOut.writeInt(iData.mDepth[3][2]);
             dataOut.writeInt(iData.mDepth[3][3]);
+            dataOut.writeInt(iData.mDepth[3][4]);
+            dataOut.writeInt(iData.mDepth[3][2]);
+            dataOut.writeInt(iData.mDepth[3][5]);
+            
             dataOut.writeInt(iData.mDepth[4][0]);
             dataOut.writeInt(iData.mDepth[4][1]);
-            dataOut.writeInt(iData.mDepth[4][2]);
             dataOut.writeInt(iData.mDepth[4][3]);
+            dataOut.writeInt(iData.mDepth[4][4]);
+            dataOut.writeInt(iData.mDepth[4][2]);
+            dataOut.writeInt(iData.mDepth[4][5]);
+            
             //dataOut.writeInt(Integer.parseInt(iData.tradedValue) * 100);
             dataOut.writeLong(iData.timeInMillis);
+            if (isAsciiRequired){
+                String asciiHeader = "1^LIVE^*^4.2!" + iData.scripCode + "^";
+                String asciiData = "^10^4^1^" + iData.timeInMillis + "^" + iData.scripCode + "^5^";
+                for(int i = 0; i < 5; i++){
+                    asciiData += format(iData.mDepth[i][0]) + "^" + iData.mDepth[i][1] + "^" + iData.mDepth[i][4] + "^0^";
+                    asciiData += format(iData.mDepth[i][2]) + "^" + iData.mDepth[i][3] + "^" + iData.mDepth[i][5] + "^0^";
+                }
+                String finalData = asciiHeader + asciiData.length() + asciiData;
+                streamAscii(finalData);
+            }
             return byteArray.toByteArray();
             
         } catch (IOException e) {
@@ -447,6 +509,10 @@ public class Publisher implements Runnable {
         } else {
             return null;
         }
+    }
+    
+    private String format(int v){
+        return nF.format(v / 100.00);
     }
 
     private byte[] sendMarketPictureBroadcast1906_TCP(IData iData) throws Exception {
@@ -793,17 +859,18 @@ public class Publisher implements Runnable {
     }
 
     private byte[] sendIndexBroadcast_TCP(IData iData) throws Exception {
-        int exchangeCode = Types.INDEX;
+        int exchangeCode = Types.BSE;
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         BSEOutputStream dataOut = new BSEOutputStream(byteArray);
 
         try {
-            byte[] tS = iData.timeStamp.getBytes();
+            //byte[] tS = iData.timeStamp.getBytes();
             byte[] sC = iData.scripId.trim().getBytes();
             dataOut.writeByte(1);
             dataOut.writeByte(exchangeCode);
             dataOut.writeByte(3);
-            dataOut.writeByte(24 + 1 + tS.length + 1 + sC.length);
+            //dataOut.writeByte(24 + 1 + tS.length + 1 + sC.length);
+            dataOut.writeByte(24 + 1 + 8 + 1 + sC.length);
             dataOut.writeByte(sC.length);
             dataOut.write(sC);
             dataOut.writeInt(iData.lastTradedPrice);
@@ -811,8 +878,9 @@ public class Publisher implements Runnable {
             dataOut.writeInt(iData.highPrice);
             dataOut.writeInt(iData.lowPrice);
             dataOut.writeInt(iData.openPrice);
-            dataOut.writeByte(tS.length);
-            dataOut.write(tS);
+            //dataOut.writeByte(tS.length);
+            //dataOut.write(tS);
+            dataOut.writeLong(iData.timeInMillis);
             return byteArray.toByteArray();
             
         } catch (IOException e) {
@@ -922,6 +990,19 @@ public class Publisher implements Runnable {
             mSocket1.send(dPacket);
         } catch (Exception lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
+        }
+    }
+    
+    private void streamAscii(String aData) {
+        try {
+            byte[] buffer = aData.getBytes();
+            DatagramPacket dPacket = new DatagramPacket(buffer, buffer.length);
+            dPacket.setAddress(sAsciiAddress);
+            dPacket.setPort(sAsciiPort);
+            mSocket1.setTimeToLive(BroadcastInfo.timeToLive);
+            mSocket1.send(dPacket);
+        } catch (IOException lEx) {
+            mLog.error("Unable to Stream ascii data, Detailed Msg is : " + lEx.getMessage());
         }
     }
 

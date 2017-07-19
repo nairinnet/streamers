@@ -33,9 +33,11 @@ public class IndicesBroadcast extends BroadcastMessages{
         short second = readShort(in);
         skipBytes(in, 4);
         short tradingSession = readShort(in);
-        String currentDate = sF.format(new Date());
+        Date aDate = new Date();
+        iData.timeInMillis = aDate.getTime();
+        //String currentDate = sF.format(new Date());
         //iData.timeStamp = currentDate + " " + hour + ":" + minute+ ":" + second;
-        iData.timeStamp = currentDate + " | " + format(hour) + ":" + format(minute);
+        //iData.timeStamp = currentDate + " | " + format(hour) + ":" + format(minute);
         iData.tradingSession = tradingSession;
         iData.noOfRecords = readShort(in);
         return iData;

@@ -15,7 +15,7 @@ import java.text.SimpleDateFormat;
  */
 public class BroadcastMessages extends CommonMessage{
     
-    protected SimpleDateFormat sF = new SimpleDateFormat("dd MMM yy");
+    protected SimpleDateFormat sF = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss");
     
     public boolean isLevel2Available(){
         return false;
