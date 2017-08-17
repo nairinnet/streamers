@@ -322,6 +322,11 @@ public class Publisher implements Runnable {
                             break;
                         case Types.BC_MARKETWATCH_NSEM:
                             //mLog.info("iData : " + iData.scripCode);
+                            if(iData.lastTradedPrice == 0 || (iData.mDepth[0][0] == 0 && iData.mDepth[0][2] == 0)) {
+                                //mLog.info("iData.scripCode : " + iData.scripCode + " BestBuyPrice:mDepth[0][0] : " + iData.mDepth[0][0] + " BestSellPrice:iData.mDepth[0][2] : " + iData.mDepth[0][2] + " BestBuyQty:mDepth[0][1] : " + iData.mDepth[0][1]  + " BestSellQty:iData.mDepth[0][3] : " + iData.mDepth[0][3] + " iData.lastTradedPrice : " + iData.lastTradedPrice);
+                                break;
+                            }
+                            
                             buffer = sendMarketPictureBroadcast_TCP(iData);
                             if (buffer != null) {
                                 streamRawbuffer(buffer);
@@ -1041,10 +1046,10 @@ public class Publisher implements Runnable {
                     dataOut.writeBytes(String.valueOf(iData.scripCode));
                     dataOut.writeInt(iData.lastTradedPrice);
                     dataOut.writeInt(iData.closePrice);
-                    dataOut.writeInt(iData.mDepth[0][0]);
-                    dataOut.writeInt(iData.mDepth[0][1]);
-                    dataOut.writeInt(iData.mDepth[0][2]);
-                    dataOut.writeInt(iData.mDepth[0][3]);
+                    dataOut.writeInt(iData.mDepth[0][0]); //BestBuyPrice
+                    dataOut.writeInt(iData.mDepth[0][1]); //BestBuyQty
+                    dataOut.writeInt(iData.mDepth[0][2]); //BestSellPrice
+                    dataOut.writeInt(iData.mDepth[0][3]); //BestSellQty
                     dataOut.writeInt(iData.tradedVolume);
                     dataOut.writeInt(iData.highPrice);
                     dataOut.writeInt(iData.lowPrice);

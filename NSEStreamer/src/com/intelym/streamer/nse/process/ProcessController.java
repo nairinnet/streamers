@@ -51,7 +51,7 @@ public class ProcessController implements ProcessManager{
             // Modified by Nirmal
             ConnectionManager cManager = new ConnectionManager(eConfiguration);
             cManager.connect();
-            scripMapTimeBased= cManager.getIndexScripList();
+            //scripMapTimeBased= cManager.getIndexScripList();
             // Modified by Nirmal
             
             
