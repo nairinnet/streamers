@@ -18,7 +18,9 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +50,9 @@ public class Publisher implements Runnable {
     private final TreeMap<Integer, ScripData> scripsMap;
     private IndexLoader indexLoader = null;
     private boolean isAsciiRequired = false;
+    
+    private boolean isAdditionalOutputEnabled = false;
+    private List<AdditionalIps> additionalIps = null;
 
     public Publisher(StreamerConfiguration aConfiguration, TreeMap sMap) {
         scripsMap = sMap;
@@ -71,6 +76,26 @@ public class Publisher implements Runnable {
                     mLog.error("Invalid output type for stream broadcast.. given " + tmp + ", expected TCP or WS");
                     System.exit(0);
             }
+        }
+        
+        try{
+        tmp = sConfiguration.getString("RIWA.AdditionalOutputs");
+        if(tmp.equalsIgnoreCase("true")){
+            this.isAdditionalOutputEnabled = true;
+            tmp = sConfiguration.getString("RIWA.AdditionalOutputAddress");
+            String[] tmpArray = tmp.split("\\,");
+            additionalIps = new ArrayList<>();
+            for(String ips : tmpArray){
+                String[] ipsAndPorts = ips.split("\\:");
+                AdditionalIps aIps = new AdditionalIps();
+                aIps.additionalIp = InetAddress.getByName(ipsAndPorts[0].trim());
+                aIps.additionalPort = Integer.valueOf(ipsAndPorts[1].trim());
+                additionalIps.add(aIps);
+            }
+        }
+        }catch(Exception e){
+            mLog.error("Unable to add additional ips for multiple outputs " + e.getMessage());
+            
         }
         try{
             indexMap = indexLoader.getIndexMap();
@@ -959,6 +984,13 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
+            if (this.isAdditionalOutputEnabled){
+                for(AdditionalIps aIps : additionalIps){
+                    dPacket.setAddress(aIps.additionalIp);
+                    dPacket.setPort(aIps.additionalPort);
+                    mSocket.send(dPacket);
+                }
+            }
         } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
@@ -971,6 +1003,13 @@ public class Publisher implements Runnable {
             dPacket.setPort(sPort);
             mSocket.setTimeToLive(BroadcastInfo.timeToLive);
             mSocket.send(dPacket);
+            if (this.isAdditionalOutputEnabled){
+                for(AdditionalIps aIps : additionalIps){
+                    dPacket.setAddress(aIps.additionalIp);
+                    dPacket.setPort(aIps.additionalPort);
+                    mSocket.send(dPacket);
+                }
+            }
         } catch (IOException lEx) {
             mLog.error("Unable to Stream data, Detailed Msg is : " + lEx.getMessage());
         }
@@ -1009,6 +1048,11 @@ public class Publisher implements Runnable {
     public static class BroadcastInfo {
 
         public static final int timeToLive = 5;
+    }
+    
+    class AdditionalIps{
+        public InetAddress additionalIp;
+        public int additionalPort;
     }
 
     
