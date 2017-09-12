@@ -905,7 +905,7 @@ public class Publisher implements Runnable {
     }
     
      private byte[] sendOpenInterest_TCP(IData iData) throws Exception {
-        int exchangeCode = Types.NSE;
+        int exchangeCode = Types.FONSE;
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         NSEOutputStream dataOut = new NSEOutputStream(byteArray);
         dataOut.writeByte(1);
